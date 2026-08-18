@@ -1,0 +1,75 @@
+// ─── English / Hindi / Kannada UI strings ─────────────────────────────────────
+import { useApp } from '@/store/app';
+
+type Tr = { en: string; hi: string; kn: string };
+type Dict = Record<string, Tr>;
+
+const STRINGS: Dict = {
+  brand: { en: 'Mini Shorts', hi: 'मिनी शॉर्ट्स', kn: 'ಮಿನಿ ಶಾರ್ಟ್ಸ್' },
+  tagline: { en: 'Marketing news · 60-word reads', hi: 'मार्केटिंग समाचार · 60 शब्दों में', kn: 'ಮಾರ್ಕೆಟಿಂಗ್ ಸುದ್ದಿ · 60 ಪದಗಳಲ್ಲಿ' },
+  live: { en: 'Live · marketing news', hi: 'लाइव · मार्केटिंग समाचार', kn: 'ಲೈವ್ · ಮಾರ್ಕೆಟಿಂಗ್ ಸುದ್ದಿ' },
+  feed: { en: 'Feed', hi: 'फ़ीड', kn: 'ಫೀಡ್' },
+  discover: { en: 'Discover', hi: 'खोज', kn: 'ಅನ್ವೇಷಿಸಿ' },
+  daily: { en: 'Daily', hi: 'डेली', kn: 'ಡೈಲಿ' },
+  insights: { en: 'Insights', hi: 'इनसाइट्स', kn: 'ಒಳನೋಟ' },
+  profile: { en: 'Profile', hi: 'प्रोफ़ाइल', kn: 'ಪ್ರೊಫೈಲ್' },
+  myFeed: { en: 'My Feed', hi: 'मेरी फ़ीड', kn: 'ನನ್ನ ಫೀಡ್' },
+  categories: { en: 'Categories', hi: 'श्रेणियाँ', kn: 'ವರ್ಗಗಳು' },
+  saved: { en: 'Saved', hi: 'सहेजे गए', kn: 'ಉಳಿಸಲಾಗಿದೆ' },
+  settings: { en: 'Settings', hi: 'सेटिंग्स', kn: 'ಸೆಟ್ಟಿಂಗ್ಸ್' },
+  readMoreAt: { en: 'read more at', hi: 'पूरा पढ़ें', kn: 'ಇಲ್ಲಿ ಓದಿ' },
+  swipeUp: { en: 'swipe up for next', hi: 'अगली खबर के लिए ऊपर स्वाइप करें', kn: 'ಮುಂದಿನದಕ್ಕೆ ಮೇಲಕ್ಕೆ ಸ್ವೈಪ್ ಮಾಡಿ' },
+  moreStories: { en: 'More stories', hi: 'और खबरें', kn: 'ಇನ್ನಷ್ಟು ಸುದ್ದಿ' },
+  search: { en: 'Search for news, topics', hi: 'समाचार, विषय खोजें', kn: 'ಸುದ್ದಿ, ವಿಷಯ ಹುಡುಕಿ' },
+  dailyDigest: { en: 'Daily Digest', hi: 'डेली डाइजेस्ट', kn: 'ಡೈಲಿ ಡೈಜೆಸ್ಟ್' },
+  todaysPicks: { en: "Today's top picks", hi: 'आज की चुनिंदा खबरें', kn: 'ಇಂದಿನ ಪ್ರಮುಖ ಸುದ್ದಿ' },
+  dailyReminder: { en: 'Daily reminder', hi: 'रोज़ाना रिमाइंडर', kn: 'ದೈನಂದಿನ ರಿಮೈಂಡರ್' },
+  reminderDesc: { en: 'Get a nudge each morning to read your digest', hi: 'हर सुबह अपना डाइजेस्ट पढ़ने का रिमाइंडर पाएं', kn: 'ಪ್ರತಿ ಬೆಳಿಗ್ಗೆ ಡೈಜೆಸ್ಟ್ ಓದಲು ರಿಮೈಂಡರ್ ಪಡೆಯಿರಿ' },
+  insightsTitle: { en: 'Marketing Insights', hi: 'मार्केटिंग इनसाइट्स', kn: 'ಮಾರ್ಕೆಟಿಂಗ್ ಒಳನೋಟ' },
+  insightsDesc: { en: 'Bite-size concepts every marketer should know', hi: 'हर मार्केटर के लिए ज़रूरी छोटे कॉन्सेप्ट', kn: 'ಪ್ರತಿ ಮಾರ್ಕೆಟರ್ ತಿಳಿಯಬೇಕಾದ ಸಣ್ಣ ಪರಿಕಲ್ಪನೆಗಳು' },
+  timelines: { en: 'Timelines', hi: 'टाइमलाइन', kn: 'ಟೈಮ್‌ಲೈನ್' },
+  timelinesDesc: { en: 'Follow a developing story, in order', hi: 'किसी बड़ी खबर को क्रम से देखें', kn: 'ಬೆಳೆಯುತ್ತಿರುವ ಸುದ್ದಿಯನ್ನು ಕ್ರಮವಾಗಿ ನೋಡಿ' },
+  yourInterests: { en: 'Your interests', hi: 'आपकी रुचियाँ', kn: 'ನಿಮ್ಮ ಆಸಕ್ತಿಗಳು' },
+  interestsDesc: { en: 'Pick topics to personalize My Feed', hi: 'मेरी फ़ीड को पर्सनलाइज़ करने के लिए विषय चुनें', kn: 'ನನ್ನ ಫೀಡ್ ಅನ್ನು ವೈಯಕ್ತಿಕಗೊಳಿಸಲು ವಿಷಯ ಆರಿಸಿ' },
+  readingStats: { en: 'Reading stats', hi: 'रीडिंग आँकड़े', kn: 'ಓದುವ ಅಂಕಿಅಂಶ' },
+  storiesRead: { en: 'Stories read', hi: 'पढ़ी खबरें', kn: 'ಓದಿದ ಸುದ್ದಿ' },
+  dayStreak: { en: 'Day streak', hi: 'दिनों की लय', kn: 'ದಿನಗಳ ಸರಣಿ' },
+  savedCount: { en: 'Saved', hi: 'सहेजे', kn: 'ಉಳಿಸಿದ' },
+  appearance: { en: 'Appearance', hi: 'दिखावट', kn: 'ಗೋಚರತೆ' },
+  language: { en: 'Language', hi: 'भाषा', kn: 'ಭಾಷೆ' },
+  system: { en: 'System', hi: 'सिस्टम', kn: 'ಸಿಸ್ಟಂ' },
+  lightMode: { en: 'Light', hi: 'लाइट', kn: 'ಲೈಟ್' },
+  darkMode: { en: 'Dark', hi: 'डार्क', kn: 'ಡಾರ್ಕ್' },
+  noSaved: { en: 'No saved stories yet', hi: 'अभी कोई सहेजी खबर नहीं', kn: 'ಇನ್ನೂ ಉಳಿಸಿದ ಸುದ್ದಿ ಇಲ್ಲ' },
+  emptyCategory: { en: 'No stories in this category yet.', hi: 'इस श्रेणी में अभी कोई खबर नहीं।', kn: 'ಈ ವರ್ಗದಲ್ಲಿ ಇನ್ನೂ ಸುದ್ದಿ ಇಲ್ಲ.' },
+  loadingLatest: { en: 'Loading latest…', hi: 'ताज़ा खबरें लोड हो रही हैं…', kn: 'ಇತ್ತೀಚಿನದನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ…' },
+  // Auth
+  account: { en: 'Account', hi: 'खाता', kn: 'ಖಾತೆ' },
+  signIn: { en: 'Sign in', hi: 'साइन इन', kn: 'ಸೈನ್ ಇನ್' },
+  signOut: { en: 'Sign out', hi: 'साइन आउट', kn: 'ಸೈನ್ ಔಟ್' },
+  guest: { en: 'Guest', hi: 'अतिथि', kn: 'ಅತಿಥಿ' },
+  signInTitle: { en: 'Sign in to Mini Shorts', hi: 'मिनी शॉर्ट्स में साइन इन करें', kn: 'ಮಿನಿ ಶಾರ್ಟ್ಸ್‌ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ' },
+  signInDesc: { en: 'Save your interests, streak and bookmarks to this profile.', hi: 'अपनी रुचियाँ, स्ट्रीक और बुकमार्क इस प्रोफ़ाइल में सहेजें।', kn: 'ನಿಮ್ಮ ಆಸಕ್ತಿ, ಸ್ಟ್ರೀಕ್ ಮತ್ತು ಬುಕ್‌ಮಾರ್ಕ್‌ಗಳನ್ನು ಈ ಪ್ರೊಫೈಲ್‌ಗೆ ಉಳಿಸಿ.' },
+  nameField: { en: 'Name', hi: 'नाम', kn: 'ಹೆಸರು' },
+  emailField: { en: 'Email', hi: 'ईमेल', kn: 'ಇಮೇಲ್' },
+  continueBtn: { en: 'Continue', hi: 'जारी रखें', kn: 'ಮುಂದುವರಿಸಿ' },
+  cancel: { en: 'Cancel', hi: 'रद्द करें', kn: 'ರದ್ದುಮಾಡಿ' },
+  signedInAs: { en: 'Signed in', hi: 'साइन इन', kn: 'ಸೈನ್ ಇನ್ ಆಗಿದೆ' },
+  withGoogle: { en: 'Continue with Google', hi: 'Google से जारी रखें', kn: 'Google ನಿಂದ ಮುಂದುವರಿಸಿ' },
+  withFacebook: { en: 'Continue with Facebook', hi: 'Facebook से जारी रखें', kn: 'Facebook ನಿಂದ ಮುಂದುವರಿಸಿ' },
+  withPhone: { en: 'Continue with phone', hi: 'फ़ोन से जारी रखें', kn: 'ಫೋನ್‌ನಿಂದ ಮುಂದುವರಿಸಿ' },
+  orText: { en: 'or', hi: 'या', kn: 'ಅಥವಾ' },
+  enterPhone: { en: 'Enter your phone number', hi: 'अपना फ़ोन नंबर दर्ज करें', kn: 'ನಿಮ್ಮ ಫೋನ್ ಸಂಖ್ಯೆ ನಮೂದಿಸಿ' },
+  phoneDesc: { en: "We'll send a one-time code to verify it.", hi: 'सत्यापन के लिए हम एक कोड भेजेंगे।', kn: 'ಪರಿಶೀಲಿಸಲು ನಾವು ಒಂದು ಕೋಡ್ ಕಳುಹಿಸುತ್ತೇವೆ.' },
+  sendCode: { en: 'Send code', hi: 'कोड भेजें', kn: 'ಕೋಡ್ ಕಳುಹಿಸಿ' },
+  enterCode: { en: 'Enter the 6-digit code', hi: '6 अंकों का कोड दर्ज करें', kn: '6 ಅಂಕಿಯ ಕೋಡ್ ನಮೂದಿಸಿ' },
+  codeSentTo: { en: 'Sent to', hi: 'भेजा गया', kn: 'ಕಳುಹಿಸಲಾಗಿದೆ' },
+  verify: { en: 'Verify', hi: 'सत्यापित करें', kn: 'ಪರಿಶೀಲಿಸಿ' },
+  termsNote: { en: 'By continuing you agree to our Terms & Privacy Policy.', hi: 'जारी रखकर आप हमारी शर्तों और गोपनीयता नीति से सहमत हैं।', kn: 'ಮುಂದುವರಿಸುವ ಮೂಲಕ ನೀವು ನಮ್ಮ ನಿಯಮ ಮತ್ತು ಗೌಪ್ಯತೆಗೆ ಸಮ್ಮತಿಸುತ್ತೀರಿ.' },
+  demoOtp: { en: 'Demo mode — enter any 6 digits to continue', hi: 'डेमो मोड — जारी रखने के लिए कोई भी 6 अंक दर्ज करें', kn: 'ಡೆಮೊ ಮೋಡ್ — ಮುಂದುವರಿಸಲು ಯಾವುದೇ 6 ಅಂಕಿ ನಮೂದಿಸಿ' },
+};
+
+export function useT() {
+  const { lang } = useApp();
+  return (key: keyof typeof STRINGS) => STRINGS[key]?.[lang] ?? STRINGS[key]?.en ?? String(key);
+}
