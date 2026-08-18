@@ -17,53 +17,43 @@ function RootTabs() {
       <Tabs
         screenOptions={{
           headerShown: false,
+          tabBarShowLabel: false,
           tabBarActiveTintColor: palette.accent,
           tabBarInactiveTintColor: palette.tabInactive,
           tabBarHideOnKeyboard: true,
           tabBarStyle: {
             backgroundColor: palette.tabBar,
             borderTopColor: palette.border,
-            paddingTop: 6,
+            height: 58,
+            paddingTop: 8,
           },
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.1 },
           sceneStyle: { backgroundColor: palette.bg },
         }}>
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: t('feed'),
-            tabBarIcon: ({ color, size }) => <Ionicons name="reader-outline" size={size} color={color} />,
-          }}
-        />
+        {/* Inshorts-style 3-icon bar: Search · Home · Profile */}
         <Tabs.Screen
           name="discover"
           options={{
             title: t('discover'),
-            tabBarIcon: ({ color, size }) => <Ionicons name="compass-outline" size={size} color={color} />,
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'search' : 'search-outline'} size={26} color={color} />,
           }}
         />
         <Tabs.Screen
-          name="daily"
+          name="index"
           options={{
-            title: t('daily'),
-            tabBarIcon: ({ color, size }) => <Ionicons name="today-outline" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="insights"
-          options={{
-            title: t('insights'),
-            tabBarIcon: ({ color, size }) => <Ionicons name="bulb-outline" size={size} color={color} />,
+            title: t('feed'),
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={26} color={color} />,
           }}
         />
         <Tabs.Screen
           name="profile"
           options={{
             title: t('profile'),
-            tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'person' : 'person-outline'} size={26} color={color} />,
           }}
         />
-        {/* Reachable by navigation, hidden from the tab bar */}
+        {/* Reachable from the top tabs / navigation, hidden from the bottom bar */}
+        <Tabs.Screen name="daily" options={{ href: null }} />
+        <Tabs.Screen name="insights" options={{ href: null }} />
         <Tabs.Screen name="bookmarks" options={{ href: null }} />
         <Tabs.Screen name="settings" options={{ href: null }} />
         <Tabs.Screen name="explore" options={{ href: null }} />

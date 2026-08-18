@@ -1,19 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CategoryMenu from '@/components/CategoryMenu';
 import NewsCard from '@/components/NewsCard';
-import { ARTICLES, CATEGORIES, type Article } from '@/data/news';
+import { ARTICLES, type Article } from '@/data/news';
 import { MY_ARTICLES } from '@/data/myArticles';
 import { fetchNews } from '@/data/remote';
 import { useT } from '@/i18n';
 import { useApp } from '@/store/app';
 
 const shuffle = (arr: Article[]) => [...arr].sort(() => Math.random() - 0.5);
-const TABS = ['My Feed', ...CATEGORIES]; // My Feed = your interests, then All + categories
+
+// Inshorts-style top strip. Some tabs filter the feed; a couple open other screens.
+type StripTab = { key: string; label: string; kind: 'feed' | 'all' | 'videos' | 'cat' | 'marketing' | 'rates'; route?: string };
+
+// Animated FlatList so each card can fade + scale as it swipes into view.
+const AList: any = Animated.FlatList;
 
 export default function Feed() {
   const { palette, category, setCategory, isDark, setMode, interests } = useApp();
@@ -28,6 +33,7 @@ export default function Feed() {
   const [tab, setTab] = useState<string>('My Feed');
   const didMount = useRef(false);
   const listRef = useRef<FlatList<Article>>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   // Load live news on mount; mix in your own stories so refresh can reshuffle all.
   useEffect(() => {
@@ -45,10 +51,27 @@ export default function Feed() {
     setTab(category);
   }, [category]);
 
+  // Top strip: section tabs.
+  const strip: StripTab[] = useMemo(
+    () => [
+      { key: 'My Feed', label: t('myFeed'), kind: 'feed' },
+      { key: 'Marketing News', label: 'Marketing News', kind: 'marketing' },
+      { key: 'Rate News', label: 'Rate News', kind: 'rates' },
+      { key: 'Finance', label: 'Finance', kind: 'rates' },
+      { key: 'Daily', label: t('daily'), kind: 'cat', route: '/daily' },
+      { key: 'Insight', label: t('insights'), kind: 'cat', route: '/insights' },
+      { key: 'Videos', label: 'Videos', kind: 'videos' },
+    ],
+    [t],
+  );
+
   const data = useMemo(() => {
     const src = live ?? (seed > 0 ? shuffle(ARTICLES) : ARTICLES);
     if (tab === 'My Feed') return interests.length ? src.filter((a) => interests.includes(a.category)) : src;
     if (tab === 'All') return src;
+    if (tab === 'Videos') return src.filter((a) => a.videoUrl);
+    if (tab === 'Marketing News') return src.filter((a) => a.category !== 'Markets');
+    if (tab === 'Rate News' || tab === 'Finance') return src.filter((a) => a.category === 'Markets');
     return src.filter((a) => a.category === tab);
   }, [live, seed, tab, interests]);
 
@@ -112,32 +135,29 @@ export default function Feed() {
               <Ionicons name="refresh" size={21} color={palette.text} />
             )}
           </Pressable>
-          <Pressable onPress={() => router.navigate('/discover')} hitSlop={8} style={styles.edgeBtn}>
-            <Ionicons name="search" size={21} color={palette.text} />
-          </Pressable>
         </View>
       </View>
 
-      {/* ── Category strip ── */}
-      <View style={styles.stripWrap}>
+      {/* ── Top text tabs (My Feed · Daily · Finance · Videos · Timelines · …) ── */}
+      <View style={[styles.stripWrap, { borderBottomColor: palette.border }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
-          {TABS.map((c) => {
-            const active = c === tab;
-            const label = c === 'My Feed' ? t('myFeed') : c;
+          {strip.map((item) => {
+            const active = !item.route && tab === item.key;
             return (
               <Pressable
-                key={c}
+                key={item.key}
                 onPress={() => {
-                  setTab(c);
-                  if (c !== 'My Feed') setCategory(c as never);
+                  if (item.route) {
+                    router.navigate(item.route as never);
+                    return;
+                  }
+                  setTab(item.key);
+                  if (item.key === 'Finance') setCategory('Markets' as never);
+                  else if (item.kind === 'cat') setCategory(item.key as never);
                 }}
-                style={[
-                  styles.chip,
-                  active
-                    ? { backgroundColor: palette.accent }
-                    : { backgroundColor: palette.chipBg, borderColor: palette.border, borderWidth: StyleSheet.hairlineWidth },
-                ]}>
-                <Text style={[styles.chipText, { color: active ? palette.accentText : palette.chipText }]}>{label}</Text>
+                style={styles.tab}>
+                <Text style={[styles.tabText, { color: active ? palette.accent : palette.textMuted }]}>{item.label}</Text>
+                <View style={[styles.tabInd, active && { backgroundColor: palette.accent }]} />
               </Pressable>
             );
           })}
@@ -147,17 +167,40 @@ export default function Feed() {
       {/* ── Paging feed (pull down or tap ↻ to refresh) ── */}
       <View style={styles.feed} onLayout={(e) => setH(Math.round(e.nativeEvent.layout.height))}>
         {h > 0 && (
-          <FlatList
+          <AList
             ref={listRef}
             key={tab}
             data={data}
-            keyExtractor={(a) => a.id}
-            renderItem={({ item }) => <NewsCard article={item} height={h} />}
+            keyExtractor={(a: Article) => a.id}
+            renderItem={({ item, index }: { item: Article; index: number }) => {
+              const inputRange = [(index - 1) * h, index * h, (index + 1) * h];
+              // Slide transition: the next card slides up into place; the leaving
+              // card eases up and dims — a clean, professional hand-off.
+              const translateY = scrollY.interpolate({
+                inputRange,
+                outputRange: [h * 0.28, 0, -h * 0.14],
+                extrapolate: 'clamp',
+              });
+              const opacity = scrollY.interpolate({
+                inputRange,
+                outputRange: [0.25, 1, 0.4],
+                extrapolate: 'clamp',
+              });
+              return (
+                <Animated.View style={{ height: h, opacity, transform: [{ translateY }] }}>
+                  <NewsCard article={item} height={h} />
+                </Animated.View>
+              );
+            }}
             pagingEnabled
             snapToInterval={h}
+            snapToAlignment="start"
+            disableIntervalMomentum
             decelerationRate="fast"
             showsVerticalScrollIndicator={false}
-            getItemLayout={(_, index) => ({ length: h, offset: h * index, index })}
+            getItemLayout={(_: unknown, index: number) => ({ length: h, offset: h * index, index })}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+            scrollEventThrottle={16}
             windowSize={5}
             maxToRenderPerBatch={3}
             initialNumToRender={2}
@@ -217,10 +260,11 @@ const styles = StyleSheet.create({
   brandMarkText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   brand: { fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#22C55E', marginLeft: 2 },
-  stripWrap: { paddingVertical: 10 },
-  strip: { paddingHorizontal: 16, gap: 8 },
-  chip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 999 },
-  chipText: { fontSize: 13, fontWeight: '700' },
+  stripWrap: { borderBottomWidth: StyleSheet.hairlineWidth },
+  strip: { paddingHorizontal: 12, alignItems: 'flex-end' },
+  tab: { paddingHorizontal: 12, paddingTop: 12, alignItems: 'center' },
+  tabText: { fontSize: 14.5, fontWeight: '800', letterSpacing: -0.2 },
+  tabInd: { height: 3, alignSelf: 'stretch', borderRadius: 2, marginTop: 9, backgroundColor: 'transparent' },
   feed: { flex: 1 },
   empty: { alignItems: 'center', justifyContent: 'center', padding: 40 },
 });

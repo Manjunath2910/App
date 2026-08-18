@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-//  YOUR OWN ARTICLES  ·  Market News
+//  YOUR OWN ARTICLES  ·  Mini Shorts
 // ═══════════════════════════════════════════════════════════════════════════
 //
 //  HOW TO ADD A STORY (copy-paste):
@@ -11,8 +11,8 @@
 //
 //  FIELD GUIDE:
 //    id          any unique text, e.g. 'my2'
-//    category    one of: 'Digital' | 'Social Media' | 'SEO' | 'Advertising'
-//                        | 'Branding' | 'AI' | 'E-commerce'
+//    category    one of: 'Markets' | 'Digital' | 'Social Media' | 'SEO'
+//                        | 'Advertising' | 'Branding' | 'AI' | 'E-commerce'
 //    title       the headline
 //    summary     the short card text — aim for about 60 words
 //    content     the full story shown when the card is tapped (can be long)

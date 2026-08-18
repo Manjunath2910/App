@@ -52,6 +52,12 @@ export default function NewsCard({ article, height }: Props) {
             </View>
           </Pressable>
         )}
+
+        {/* App-name badge (bottom-left of the image) — real app icon + name */}
+        <View style={styles.brandBadge}>
+          <Image source={require('../../assets/images/icon.png')} style={styles.brandIcon} contentFit="cover" />
+          <Text style={styles.brandName}>Mini Shorts</Text>
+        </View>
       </View>
 
       {/* ── Body (tap anywhere to read the full story) ── */}
@@ -110,6 +116,20 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.9)',
   },
+  brandBadge: {
+    position: 'absolute',
+    left: 12,
+    bottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  brandIcon: { width: 18, height: 18, borderRadius: 5 },
+  brandName: { color: '#1F1F26', fontSize: 12.5, fontWeight: '800', letterSpacing: -0.2 },
   body: { flex: 1, paddingHorizontal: 22, paddingTop: 16, paddingBottom: 8 },
   title: { fontSize: 23, fontWeight: '700', lineHeight: 30, letterSpacing: -0.3 },
   meta: { fontSize: 12, marginTop: 8, lineHeight: 17 },
