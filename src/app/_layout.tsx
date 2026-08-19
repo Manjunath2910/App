@@ -1,16 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import FullArticle from '@/components/FullArticle';
 import { useT } from '@/i18n';
 import { AppProvider, useApp } from '@/store/app';
+import { registerForPush } from '@/utils/push';
 
 function RootTabs() {
   const { palette, isDark } = useApp();
   const t = useT();
+  useEffect(() => {
+    registerForPush(); // register this device for new-blog push (no-op until set up)
+  }, []);
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />

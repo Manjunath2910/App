@@ -1,14 +1,15 @@
 // ─── SignIn — Google · Facebook · Apple · Phone (OTP) ─────────────────────────
-// Google/Facebook/Apple sign in locally for now; Phone runs a local OTP flow.
-// Real OAuth needs provider credentials + a backend (see FIREBASE_AUTH_SETUP.md).
+// Google + Phone are REAL (Firebase) on the device dev build. On web preview they
+// fall back to a demo tap-through. Facebook/Apple stay demo until wired next.
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useT } from '@/i18n';
 import { useApp, type User } from '@/store/app';
+import { authReady, confirmOtp, sendOtp, signInWithGoogle } from '@/services/auth';
 
 type Props = { visible: boolean; onClose: () => void; onSuccess?: () => void };
 type Step = 'options' | 'phone' | 'otp';
@@ -22,11 +23,17 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
   const [step, setStep] = useState<Step>('options');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmation, setConfirmation] = useState<any>(null);
 
   const reset = () => {
     setStep('options');
     setPhone('');
     setOtp('');
+    setBusy(false);
+    setError('');
+    setConfirmation(null);
   };
   const done = (u: User) => {
     signIn(u);
@@ -37,6 +44,62 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
   const cancel = () => {
     reset();
     onClose();
+  };
+
+  // Google — real on device, demo on web preview.
+  const onGoogle = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      const u = await signInWithGoogle();
+      done(u);
+    } catch (e: any) {
+      if (e?.message === 'web-preview') {
+        done({ name: 'Google account', email: '' });
+      } else if (String(e?.code).includes('cancel') || String(e?.message).toLowerCase().includes('cancel')) {
+        // user closed the Google sheet — do nothing
+      } else {
+        setError('Google sign-in failed. Make sure the app’s SHA-1 is added in Firebase.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Phone — send real OTP on device, demo on web preview.
+  const onSendCode = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      if (authReady()) {
+        const conf = await sendOtp(`+91${phone}`);
+        setConfirmation(conf);
+      } else {
+        setConfirmation(null); // demo
+      }
+      setStep('otp');
+    } catch (e: any) {
+      setError('Could not send the code. Check the number and try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onVerify = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      if (confirmation) {
+        const u = await confirmOtp(confirmation, otp);
+        done(u);
+      } else {
+        done({ name: `+91 ${phone}`, email: '' }); // demo
+      }
+    } catch (e: any) {
+      setError('Wrong or expired code. Try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const phoneValid = /^[0-9]{10}$/.test(phone);
@@ -58,25 +121,28 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
         <View style={styles.body}>
           {step === 'options' && (
             <>
-              <Pressable onPress={() => done({ name: 'Google account', email: '' })} style={[styles.btn, { backgroundColor: palette.card, borderColor: palette.border, borderWidth: StyleSheet.hairlineWidth }]}>
+              <Pressable onPress={onGoogle} disabled={busy} style={[styles.btn, { backgroundColor: palette.card, borderColor: palette.border, borderWidth: StyleSheet.hairlineWidth, opacity: busy ? 0.6 : 1 }]}>
                 <Ionicons name="logo-google" size={20} color="#EA4335" />
                 <Text style={[styles.btnText, { color: palette.text }]}>Sign in with google</Text>
               </Pressable>
 
-              <Pressable onPress={() => done({ name: 'Facebook account', email: '' })} style={[styles.btn, { backgroundColor: '#1877F2' }]}>
+              <Pressable onPress={() => done({ name: 'Facebook account', email: '' })} disabled={busy} style={[styles.btn, { backgroundColor: '#1877F2' }]}>
                 <Ionicons name="logo-facebook" size={20} color="#fff" />
                 <Text style={[styles.btnText, { color: '#fff' }]}>Sign in with facebook</Text>
               </Pressable>
 
-              <Pressable onPress={() => done({ name: 'Apple account', email: '' })} style={[styles.btn, { backgroundColor: '#000' }]}>
+              <Pressable onPress={() => done({ name: 'Apple account', email: '' })} disabled={busy} style={[styles.btn, { backgroundColor: '#000' }]}>
                 <Ionicons name="logo-apple" size={21} color="#fff" />
                 <Text style={[styles.btnText, { color: '#fff' }]}>Sign in with apple</Text>
               </Pressable>
 
-              <Pressable onPress={() => setStep('phone')} style={[styles.btn, { backgroundColor: '#2D9CDB' }]}>
+              <Pressable onPress={() => setStep('phone')} disabled={busy} style={[styles.btn, { backgroundColor: '#2D9CDB' }]}>
                 <Ionicons name="phone-portrait-outline" size={20} color="#fff" />
                 <Text style={[styles.btnText, { color: '#fff' }]}>Sign in with phone</Text>
               </Pressable>
+
+              {busy && <ActivityIndicator style={{ marginTop: 4 }} color={palette.accent} />}
+              {!!error && <Text style={[styles.errText, { color: '#E11D48' }]}>{error}</Text>}
             </>
           )}
 
@@ -96,9 +162,10 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
                   autoFocus
                 />
               </View>
-              <Pressable onPress={() => setStep('otp')} disabled={!phoneValid} style={[styles.cta, { backgroundColor: phoneValid ? palette.accent : palette.surfaceAlt }]}>
-                <Text style={[styles.ctaText, { color: phoneValid ? '#fff' : palette.textFaint }]}>{t('sendCode')}</Text>
+              <Pressable onPress={onSendCode} disabled={!phoneValid || busy} style={[styles.cta, { backgroundColor: phoneValid && !busy ? palette.accent : palette.surfaceAlt }]}>
+                {busy ? <ActivityIndicator color="#fff" /> : <Text style={[styles.ctaText, { color: phoneValid ? '#fff' : palette.textFaint }]}>{t('sendCode')}</Text>}
               </Pressable>
+              {!!error && <Text style={[styles.errText, { color: '#E11D48' }]}>{error}</Text>}
             </>
           )}
 
@@ -106,10 +173,12 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
             <>
               <Text style={[styles.title, { color: palette.text }]}>{t('enterCode')}</Text>
               <Text style={[styles.desc, { color: palette.textMuted }]}>{t('codeSentTo')} +91 {phone}</Text>
-              <View style={[styles.demoBanner, { backgroundColor: palette.accentSoft }]}>
-                <Ionicons name="information-circle-outline" size={16} color={palette.accent} />
-                <Text style={[styles.demoText, { color: palette.accent }]}>{t('demoOtp')}</Text>
-              </View>
+              {!confirmation && (
+                <View style={[styles.demoBanner, { backgroundColor: palette.accentSoft }]}>
+                  <Ionicons name="information-circle-outline" size={16} color={palette.accent} />
+                  <Text style={[styles.demoText, { color: palette.accent }]}>{t('demoOtp')}</Text>
+                </View>
+              )}
               <TextInput
                 value={otp}
                 onChangeText={(v) => setOtp(v.replace(/\D/g, '').slice(0, 6))}
@@ -119,9 +188,10 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
                 style={[styles.otpInput, { color: palette.text, backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}
                 autoFocus
               />
-              <Pressable onPress={() => done({ name: `+91 ${phone}`, email: '' })} disabled={!otpValid} style={[styles.cta, { backgroundColor: otpValid ? palette.accent : palette.surfaceAlt }]}>
-                <Text style={[styles.ctaText, { color: otpValid ? '#fff' : palette.textFaint }]}>{t('verify')}</Text>
+              <Pressable onPress={onVerify} disabled={!otpValid || busy} style={[styles.cta, { backgroundColor: otpValid && !busy ? palette.accent : palette.surfaceAlt }]}>
+                {busy ? <ActivityIndicator color="#fff" /> : <Text style={[styles.ctaText, { color: otpValid ? '#fff' : palette.textFaint }]}>{t('verify')}</Text>}
               </Pressable>
+              {!!error && <Text style={[styles.errText, { color: '#E11D48' }]}>{error}</Text>}
             </>
           )}
         </View>
@@ -148,4 +218,5 @@ const styles = StyleSheet.create({
   otpInput: { height: 56, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, fontSize: 26, fontWeight: '800', textAlign: 'center', letterSpacing: 12 },
   cta: { alignItems: 'center', justifyContent: 'center', height: 54, borderRadius: 14, marginTop: 20 },
   ctaText: { fontSize: 16, fontWeight: '800' },
+  errText: { fontSize: 13, fontWeight: '600', textAlign: 'center', marginTop: 6 },
 });

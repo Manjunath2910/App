@@ -32,7 +32,6 @@ export default function Feed() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [live, setLive] = useState<Article[] | null>(null); // live backend articles
   const [blogs, setBlogs] = useState<Article[]>([]); // ZoltMoney blog posts
-  const [blogsLoading, setBlogsLoading] = useState(true);
   const [seed, setSeed] = useState(0); // reshuffle trigger for the offline fallback
   const [loadingMore, setLoadingMore] = useState(false);
   const [tab, setTab] = useState<string>('My Feed');
@@ -45,9 +44,7 @@ export default function Feed() {
     fetchNews().then((a) => {
       if (a.length) setLive([...MY_ARTICLES, ...a]);
     });
-    fetchBlogs()
-      .then((b) => b.length && setBlogs(b))
-      .finally(() => setBlogsLoading(false));
+    fetchBlogs().then((b) => b.length && setBlogs(b));
   }, []);
 
   // When another screen changes the category (menu / discover), follow it.
@@ -76,8 +73,8 @@ export default function Feed() {
   const data = useMemo(() => {
     // Your own posts first, then blogs + live/bundled news.
     const src = [...myPosts, ...blogs, ...(live ?? (seed > 0 ? shuffle(ARTICLES) : ARTICLES))];
-    // My Feed = only ZoltMoney blogs + your own articles.
-    if (tab === 'My Feed') return [...myPosts, ...blogs];
+    // My Feed = ZoltMoney blogs + your articles + all marketing news.
+    if (tab === 'My Feed') return src;
     if (tab === 'All') return src;
     if (tab === 'Videos') return src.filter((a) => a.videoUrl);
     if (tab === 'Marketing News') return src.filter((a) => a.category !== 'Markets' && a.category !== 'Blogs');
@@ -222,14 +219,7 @@ export default function Feed() {
             onEndReachedThreshold={1.2}
             ListEmptyComponent={
               <View style={[styles.empty, { height: h }]}>
-                {blogsLoading ? (
-                  <>
-                    <ActivityIndicator color={palette.accent} />
-                    <Text style={{ color: palette.textMuted, marginTop: 12 }}>Loading ZoltMoney blogs…</Text>
-                  </>
-                ) : (
-                  <Text style={{ color: palette.textMuted }}>{t('emptyCategory')}</Text>
-                )}
+                <Text style={{ color: palette.textMuted }}>{t('emptyCategory')}</Text>
               </View>
             }
             refreshControl={

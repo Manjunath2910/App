@@ -1,0 +1,9 @@
+{
+  "name": "mini-shorts-push-server",
+  "version": "1.0.0",
+  "description": "Watches the ZoltMoney blog and sends Expo push notifications when a new post is published.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": { "start": "node index.js" },
+  "dependencies": { "express": "^4.19.2" }
+}

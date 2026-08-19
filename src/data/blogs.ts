@@ -1,16 +1,15 @@
 // ─── ZoltMoney blogs (WordPress REST API) ─────────────────────────────────────
-// Light list fetch (title + excerpt + image) so every post loads fast and
-// reliably; the full article body is fetched on demand when a blog is opened.
-// New posts appear automatically (fetched newest-first on every load / refresh).
+// Primary: fetch with the body in small batches → fuller summaries + full text.
+// Fallback: a light fetch (title + excerpt + image) so blogs always load even
+// when a web proxy can't handle the bigger responses. New posts appear
+// automatically (fetched newest-first on every load / refresh).
 import { Platform } from 'react-native';
 
 import { fallbackImage } from './liveFeeds';
 import type { Article } from './news';
 
 const WP = 'https://blogs.getpanda.money/wp-json/wp/v2/posts';
-const LIST_FIELDS = 'id,link,date,title,excerpt,jetpack_featured_media_url';
 
-// On web the browser blocks cross-site requests; try a couple of proxies.
 const WEB_PROXIES = [
   (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
@@ -49,38 +48,46 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-async function getPage(page: number, perPage: number): Promise<any[]> {
-  const json = await getJson(`${WP}?per_page=${perPage}&page=${page}&_fields=${LIST_FIELDS}`);
-  return Array.isArray(json) ? json : [];
+function firstWords(text: string, n: number): string {
+  const w = text.split(' ').filter(Boolean);
+  return w.length <= n ? text : w.slice(0, n).join(' ') + '…';
 }
 
-// Fetch every page (all languages) and keep them all.
-export async function fetchBlogs(pages = 6, perPage = 100): Promise<Article[]> {
-  const results = await Promise.all(Array.from({ length: pages }, (_, i) => getPage(i + 1, perPage)));
-  const all = results.flat().filter((p: any) => p && p.id);
+async function fetchList(fields: string, pages: number, perPage: number): Promise<any[]> {
+  const results = await Promise.all(
+    Array.from({ length: pages }, (_, i) => getJson(`${WP}?per_page=${perPage}&page=${i + 1}&_fields=${fields}`)),
+  );
+  const all = results.flatMap((r) => (Array.isArray(r) ? r : [])).filter((p: any) => p && p.id);
   const seen = new Set<number>();
-  const uniq = all.filter((p: any) => (seen.has(p.id) ? false : seen.add(p.id)));
-  return uniq
-    .map((p: any) => {
-      const summary = stripHtml(p?.excerpt?.rendered || '') || stripHtml(p?.title?.rendered || '');
-      return {
-        id: `blog-${p.id}`,
-        category: 'Blogs' as const,
-        title: stripHtml(p?.title?.rendered || ''),
-        summary,
-        content: summary, // replaced with the full body when opened
-        imageUrl: p?.jetpack_featured_media_url || fallbackImage('Digital'),
-        source: 'ZoltMoney',
-        author: 'ZoltMoney',
-        url: typeof p?.link === 'string' ? p.link : 'https://zoltmoney.com/en/blogs/',
-        publishedAt: p?.date || new Date().toISOString(),
-        accent: '#A21563',
-      } as Article;
-    })
-    .filter((a) => a.title);
+  return all.filter((p: any) => (seen.has(p.id) ? false : seen.add(p.id)));
 }
 
-// Full article body for one blog (fetched when the reader opens it).
+function toArticle(p: any, full: string): Article {
+  const excerpt = stripHtml(p?.excerpt?.rendered || '');
+  const summary = firstWords(full || excerpt, 60) || excerpt || stripHtml(p?.title?.rendered || '');
+  return {
+    id: `blog-${p.id}`,
+    category: 'Blogs',
+    title: stripHtml(p?.title?.rendered || ''),
+    summary,
+    content: summary, // reader shows just the short summary (not the full body)
+    imageUrl: p?.jetpack_featured_media_url || fallbackImage('Digital'),
+    source: 'ZoltMoney',
+    author: 'ZoltMoney',
+    url: typeof p?.link === 'string' ? p.link : 'https://zoltmoney.com/en/blogs/',
+    publishedAt: p?.date || new Date().toISOString(),
+    accent: '#A21563',
+  };
+}
+
+export async function fetchBlogs(): Promise<Article[]> {
+  // Light fetch (title + excerpt + image) — small, fast, reliable. Loads every
+  // post; the reader shows this short summary. New posts appear automatically.
+  const posts = await fetchList('id,link,date,title,excerpt,jetpack_featured_media_url', 6, 100);
+  return posts.map((p) => toArticle(p, '')).filter((a) => a.title);
+}
+
+// Full article body for one blog (used by the reader if the list came light).
 export async function fetchBlogContent(blogId: string): Promise<string> {
   const numeric = blogId.replace('blog-', '');
   const json = await getJson(`${WP}/${numeric}?_fields=content`);

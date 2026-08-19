@@ -150,6 +150,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(() => {
     setUser(null);
     AsyncStorage.removeItem(USER_KEY).catch(() => {});
+    // Best-effort: end the Firebase/Google native session too.
+    import('@/services/auth').then((m) => m.signOutAll()).catch(() => {});
   }, []);
 
   const addPost = useCallback((a: Article) => {

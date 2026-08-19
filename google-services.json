@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "879745781493",
+    "project_id": "mini-shorts-5b2ce",
+    "storage_bucket": "mini-shorts-5b2ce.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:879745781493:android:ae236cef74e382caee7fbc",
+        "android_client_info": {
+          "package_name": "com.manjunath2910.marketbrief"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "879745781493-0l1716p3pbs4ilhnta5qf1922fou3m16.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.manjunath2910.marketbrief",
+            "certificate_hash": "b7cff9770b467c840a32d05f0a46aa3f83ddef42"
+          }
+        },
+        {
+          "client_id": "879745781493-69pejb7mp8rc12tj9no5tld02e0okbpp.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSK5f4YuReojVdeW1vkkvuQrWjBcMCJSk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "879745781493-69pejb7mp8rc12tj9no5tld02e0okbpp.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
