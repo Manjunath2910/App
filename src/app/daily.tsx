@@ -23,13 +23,15 @@ export default function Daily() {
   const insets = useSafeAreaInsets();
   const [live, setLive] = useState<Article[] | null>(null);
   const [started, setStarted] = useState<boolean | null>(null);
-  const [phase, setPhase] = useState<'intro' | 'questions' | 'age' | 'gender' | 'topics' | 'name'>('intro');
+  const [phase, setPhase] = useState<'intro' | 'questions' | 'age' | 'gender' | 'topics' | 'name' | 'city'>('intro');
   const [reason, setReason] = useState<number | null>(null);
   const [age, setAge] = useState<number | null>(null);
   const [gender, setGender] = useState<number | null>(null);
   const [topics, setTopics] = useState<number[]>([]);
   const [others, setOthers] = useState('');
   const [name, setName] = useState('');
+  const [city, setCity] = useState<number | null>(null);
+  const [cityOther, setCityOther] = useState('');
   const [showSignIn, setShowSignIn] = useState(false);
 
   useEffect(() => {
@@ -348,7 +350,7 @@ export default function Daily() {
                 <Text style={styles.navText}>Back</Text>
               </Pressable>
               <Pressable
-                onPress={submitName}
+                onPress={() => setPhase('city')}
                 disabled={!nameOk}
                 style={[styles.backBtn, { backgroundColor: nameOk ? palette.accent : palette.surfaceAlt }]}>
                 <Text style={[styles.navText, { color: nameOk ? '#fff' : palette.textFaint }]}>Next</Text>
@@ -357,6 +359,83 @@ export default function Daily() {
             </View>
           </ScrollView>
         </View>
+      </View>
+    );
+  }
+
+  // ── City step (final) ──
+  if (!started && phase === 'city') {
+    const CITIES = ['Bangalore', 'Chennai', 'Delhi', 'Gurugram', 'Hyderabad', 'Jaipur', 'Kolkata', 'Mumbai', 'Noida', 'Pune'];
+    const cityOk = city !== null || cityOther.trim().length > 0;
+    const loginAndStart = () => {
+      const chosen = city !== null ? CITIES[city] : cityOther.trim();
+      AsyncStorage.setItem('mb:city', chosen).catch(() => {});
+      setShowSignIn(true); // open sign-in; onSuccess starts the ritual
+    };
+    return (
+      <View style={[styles.introRoot, { backgroundColor: palette.bg, paddingTop: insets.top }]}>
+        <View style={[styles.introCard, { backgroundColor: palette.accentSoft }]}>
+          <View style={[styles.blob, styles.blob1, { backgroundColor: palette.accent }]} />
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }} keyboardShouldPersistTaps="handled">
+            <Text style={[styles.qTitle, { color: palette.text, marginTop: 20 }]}>
+              Tell us your city so we can feature you on city-wise leaderboards.
+            </Text>
+
+            {/* Skyline illustration */}
+            <View style={styles.cityWrap}>
+              <Ionicons name="location" size={30} color={palette.accent} style={{ marginBottom: -8, zIndex: 2 }} />
+              <View style={styles.skyline}>
+                <Ionicons name="business" size={38} color="#3B82F6" />
+                <Ionicons name="business" size={48} color="#6366F1" />
+                <Ionicons name="home" size={30} color="#10B981" />
+                <Ionicons name="business-outline" size={34} color="#F59E0B" />
+              </View>
+            </View>
+
+            <View style={styles.cityGrid}>
+              {CITIES.map((label, i) => {
+                const on = city === i;
+                return (
+                  <Pressable
+                    key={label}
+                    onPress={() => setCity(i)}
+                    style={[
+                      styles.cityChip,
+                      { backgroundColor: palette.card, borderColor: on ? palette.accent : palette.border, borderWidth: on ? 2 : StyleSheet.hairlineWidth },
+                    ]}>
+                    <Text style={[styles.ageText, { color: on ? palette.accent : palette.text }]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <TextInput
+              value={cityOther}
+              onChangeText={(v) => {
+                setCityOther(v);
+                if (v) setCity(null);
+              }}
+              placeholder="Others [Type Here…]"
+              placeholderTextColor={palette.textFaint}
+              style={[styles.othersInput, { backgroundColor: palette.card, borderColor: palette.border, color: palette.text }]}
+            />
+
+            <View style={styles.navRow}>
+              <Pressable onPress={() => setPhase('name')} style={[styles.backBtn, { backgroundColor: palette.accent }]}>
+                <Ionicons name="chevron-back" size={18} color="#fff" />
+                <Text style={styles.navText}>Back</Text>
+              </Pressable>
+              <Pressable
+                onPress={loginAndStart}
+                disabled={!cityOk}
+                style={[styles.backBtn, { backgroundColor: cityOk ? palette.accent : palette.surfaceAlt }]}>
+                <Text style={[styles.navText, { color: cityOk ? '#fff' : palette.textFaint }]}>Login & Start Ritual</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+
+        <SignIn visible={showSignIn} onClose={() => setShowSignIn(false)} onSuccess={finish} />
       </View>
     );
   }
@@ -417,7 +496,7 @@ export default function Daily() {
           </ScrollView>
         </View>
 
-        <SignIn visible={showSignIn} onClose={() => setShowSignIn(false)} />
+        <SignIn visible={showSignIn} onClose={() => setShowSignIn(false)} onSuccess={finish} />
       </View>
     );
   }
@@ -554,6 +633,10 @@ const styles = StyleSheet.create({
   idPhoto: { width: 56, height: 56, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   idLine: { height: 8, borderRadius: 4 },
   idHeart: { position: 'absolute', right: 12, bottom: 12 },
+  cityWrap: { alignItems: 'center', marginTop: 18, marginBottom: 22 },
+  skyline: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, paddingBottom: 4, borderBottomWidth: 2, borderBottomColor: 'rgba(128,128,128,0.25)', paddingHorizontal: 6 },
+  cityGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
+  cityChip: { width: '44%', alignItems: 'center', paddingVertical: 13, borderRadius: 12 },
   navRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 30 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 22, height: 48, borderRadius: 13 },
   navText: { color: '#fff', fontSize: 16, fontWeight: '800' },

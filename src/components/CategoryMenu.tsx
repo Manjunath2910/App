@@ -9,6 +9,7 @@ import { useApp } from '@/store/app';
 
 const CAT_COLOR: Record<string, string> = {
   All: '#E11D48',
+  Blogs: '#A21563',
   Markets: '#16A34A',
   Digital: '#EC4899',
   'Social Media': '#E11D48',
@@ -21,6 +22,7 @@ const CAT_COLOR: Record<string, string> = {
 
 const CAT_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   All: 'newspaper-outline',
+  Blogs: 'document-text-outline',
   Markets: 'trending-up-outline',
   Digital: 'globe-outline',
   'Social Media': 'chatbubbles-outline',

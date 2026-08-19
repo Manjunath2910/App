@@ -1,7 +1,8 @@
-// ─── SignIn — Google · Facebook · Phone (OTP) sign-in sheet ───────────────────
-// Phone flow is fully functional locally (number → 6-digit code). Google/Facebook
-// sign in locally for now; real OAuth needs provider credentials + a backend.
+// ─── SignIn — Google · Facebook · Apple · Phone (OTP) ─────────────────────────
+// Google/Facebook/Apple sign in locally for now; Phone runs a local OTP flow.
+// Real OAuth needs provider credentials + a backend (see FIREBASE_AUTH_SETUP.md).
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,10 +10,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useT } from '@/i18n';
 import { useApp, type User } from '@/store/app';
 
-type Props = { visible: boolean; onClose: () => void };
+type Props = { visible: boolean; onClose: () => void; onSuccess?: () => void };
 type Step = 'options' | 'phone' | 'otp';
 
-export default function SignIn({ visible, onClose }: Props) {
+const ICON = require('../../assets/images/icon.png');
+
+export default function SignIn({ visible, onClose, onSuccess }: Props) {
   const { palette, signIn } = useApp();
   const t = useT();
   const insets = useSafeAreaInsets();
@@ -20,17 +23,18 @@ export default function SignIn({ visible, onClose }: Props) {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
 
-  const done = (u: User) => {
-    signIn(u);
-    reset();
-    onClose();
-  };
   const reset = () => {
     setStep('options');
     setPhone('');
     setOtp('');
   };
-  const close = () => {
+  const done = (u: User) => {
+    signIn(u);
+    reset();
+    onSuccess?.();
+    onClose();
+  };
+  const cancel = () => {
     reset();
     onClose();
   };
@@ -39,56 +43,43 @@ export default function SignIn({ visible, onClose }: Props) {
   const otpValid = /^[0-9]{4,6}$/.test(otp);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={close} statusBarTranslucent>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.root}>
-        <Pressable style={styles.backdrop} onPress={close} />
-        <View style={[styles.sheet, { backgroundColor: palette.card, paddingBottom: insets.bottom + 18 }]}>
-          <View style={styles.grip} />
+    <Modal visible={visible} animationType="slide" onRequestClose={cancel}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.root, { backgroundColor: palette.card, paddingTop: insets.top + 6 }]}>
+        {/* Cancel / Back */}
+        <View style={styles.topBar}>
+          <Pressable onPress={step === 'options' ? cancel : () => setStep(step === 'otp' ? 'phone' : 'options')} hitSlop={10}>
+            <Text style={[styles.cancel, { color: '#2F80ED' }]}>{step === 'options' ? t('cancel') : 'Back'}</Text>
+          </Pressable>
+        </View>
 
-          {step !== 'options' && (
-            <Pressable onPress={() => setStep(step === 'otp' ? 'phone' : 'options')} style={styles.back} hitSlop={10}>
-              <Ionicons name="chevron-back" size={22} color={palette.text} />
-            </Pressable>
-          )}
+        {/* App icon */}
+        <Image source={ICON} style={styles.appIcon} contentFit="cover" />
 
-          <View style={[styles.logo, { backgroundColor: palette.accent }]}>
-            <Text style={styles.logoText}>M</Text>
-          </View>
-
-          {/* ── Options ── */}
+        <View style={styles.body}>
           {step === 'options' && (
             <>
-              <Text style={[styles.title, { color: palette.text }]}>{t('signInTitle')}</Text>
-              <Text style={[styles.desc, { color: palette.textMuted }]}>{t('signInDesc')}</Text>
-
-              <Pressable
-                onPress={() => done({ name: 'Google account', email: '' })}
-                style={[styles.provider, { backgroundColor: palette.card, borderColor: palette.border }]}>
+              <Pressable onPress={() => done({ name: 'Google account', email: '' })} style={[styles.btn, { backgroundColor: palette.card, borderColor: palette.border, borderWidth: StyleSheet.hairlineWidth }]}>
                 <Ionicons name="logo-google" size={20} color="#EA4335" />
-                <Text style={[styles.providerText, { color: palette.text }]}>{t('withGoogle')}</Text>
+                <Text style={[styles.btnText, { color: palette.text }]}>Sign in with google</Text>
               </Pressable>
 
-              <Pressable onPress={() => done({ name: 'Facebook account', email: '' })} style={[styles.provider, { backgroundColor: '#1877F2', borderColor: '#1877F2' }]}>
+              <Pressable onPress={() => done({ name: 'Facebook account', email: '' })} style={[styles.btn, { backgroundColor: '#1877F2' }]}>
                 <Ionicons name="logo-facebook" size={20} color="#fff" />
-                <Text style={[styles.providerText, { color: '#fff' }]}>{t('withFacebook')}</Text>
+                <Text style={[styles.btnText, { color: '#fff' }]}>Sign in with facebook</Text>
               </Pressable>
 
-              <View style={styles.orRow}>
-                <View style={[styles.orLine, { backgroundColor: palette.border }]} />
-                <Text style={[styles.orText, { color: palette.textFaint }]}>{t('orText')}</Text>
-                <View style={[styles.orLine, { backgroundColor: palette.border }]} />
-              </View>
-
-              <Pressable onPress={() => setStep('phone')} style={[styles.provider, { backgroundColor: palette.accent, borderColor: palette.accent }]}>
-                <Ionicons name="call-outline" size={19} color="#fff" />
-                <Text style={[styles.providerText, { color: '#fff' }]}>{t('withPhone')}</Text>
+              <Pressable onPress={() => done({ name: 'Apple account', email: '' })} style={[styles.btn, { backgroundColor: '#000' }]}>
+                <Ionicons name="logo-apple" size={21} color="#fff" />
+                <Text style={[styles.btnText, { color: '#fff' }]}>Sign in with apple</Text>
               </Pressable>
 
-              <Text style={[styles.terms, { color: palette.textFaint }]}>{t('termsNote')}</Text>
+              <Pressable onPress={() => setStep('phone')} style={[styles.btn, { backgroundColor: '#2D9CDB' }]}>
+                <Ionicons name="phone-portrait-outline" size={20} color="#fff" />
+                <Text style={[styles.btnText, { color: '#fff' }]}>Sign in with phone</Text>
+              </Pressable>
             </>
           )}
 
-          {/* ── Phone number ── */}
           {step === 'phone' && (
             <>
               <Text style={[styles.title, { color: palette.text }]}>{t('enterPhone')}</Text>
@@ -105,22 +96,16 @@ export default function SignIn({ visible, onClose }: Props) {
                   autoFocus
                 />
               </View>
-              <Pressable
-                onPress={() => setStep('otp')}
-                disabled={!phoneValid}
-                style={[styles.cta, { backgroundColor: phoneValid ? palette.accent : palette.surfaceAlt }]}>
+              <Pressable onPress={() => setStep('otp')} disabled={!phoneValid} style={[styles.cta, { backgroundColor: phoneValid ? palette.accent : palette.surfaceAlt }]}>
                 <Text style={[styles.ctaText, { color: phoneValid ? '#fff' : palette.textFaint }]}>{t('sendCode')}</Text>
               </Pressable>
             </>
           )}
 
-          {/* ── OTP ── */}
           {step === 'otp' && (
             <>
               <Text style={[styles.title, { color: palette.text }]}>{t('enterCode')}</Text>
-              <Text style={[styles.desc, { color: palette.textMuted }]}>
-                {t('codeSentTo')} +91 {phone}
-              </Text>
+              <Text style={[styles.desc, { color: palette.textMuted }]}>{t('codeSentTo')} +91 {phone}</Text>
               <View style={[styles.demoBanner, { backgroundColor: palette.accentSoft }]}>
                 <Ionicons name="information-circle-outline" size={16} color={palette.accent} />
                 <Text style={[styles.demoText, { color: palette.accent }]}>{t('demoOtp')}</Text>
@@ -134,10 +119,7 @@ export default function SignIn({ visible, onClose }: Props) {
                 style={[styles.otpInput, { color: palette.text, backgroundColor: palette.surfaceAlt, borderColor: palette.border }]}
                 autoFocus
               />
-              <Pressable
-                onPress={() => done({ name: `+91 ${phone}`, email: '' })}
-                disabled={!otpValid}
-                style={[styles.cta, { backgroundColor: otpValid ? palette.accent : palette.surfaceAlt }]}>
+              <Pressable onPress={() => done({ name: `+91 ${phone}`, email: '' })} disabled={!otpValid} style={[styles.cta, { backgroundColor: otpValid ? palette.accent : palette.surfaceAlt }]}>
                 <Text style={[styles.ctaText, { color: otpValid ? '#fff' : palette.textFaint }]}>{t('verify')}</Text>
               </Pressable>
             </>
@@ -149,36 +131,21 @@ export default function SignIn({ visible, onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 22, paddingTop: 10 },
-  grip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.4)', marginBottom: 16 },
-  back: { position: 'absolute', left: 16, top: 18, width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  logo: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  logoText: { color: '#fff', fontSize: 24, fontWeight: '900' },
-  title: { fontSize: 21, fontWeight: '900', letterSpacing: -0.4 },
-  desc: { fontSize: 14, lineHeight: 20, marginTop: 6, marginBottom: 18 },
-  provider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    height: 52,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 11,
-  },
-  providerText: { fontSize: 15.5, fontWeight: '800' },
-  orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 6 },
-  orLine: { flex: 1, height: StyleSheet.hairlineWidth },
-  orText: { fontSize: 12.5, fontWeight: '700' },
-  terms: { fontSize: 11.5, textAlign: 'center', marginTop: 16, lineHeight: 17 },
-  phoneRow: { flexDirection: 'row', alignItems: 'center', height: 52, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  cc: { fontSize: 16, fontWeight: '800', paddingHorizontal: 15, borderRightWidth: StyleSheet.hairlineWidth, height: '100%', textAlignVertical: 'center', lineHeight: 52 },
+  root: { flex: 1, paddingHorizontal: 24 },
+  topBar: { height: 40, justifyContent: 'center' },
+  cancel: { fontSize: 17, fontWeight: '600' },
+  appIcon: { width: 84, height: 84, borderRadius: 20, alignSelf: 'center', marginTop: 40 },
+  body: { marginTop: 60, gap: 16 },
+  btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 56, borderRadius: 12 },
+  btnText: { fontSize: 16, fontWeight: '700' },
+  title: { fontSize: 21, fontWeight: '900', letterSpacing: -0.4, marginBottom: 6 },
+  desc: { fontSize: 14, lineHeight: 20, marginBottom: 16 },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', height: 54, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  cc: { fontSize: 16, fontWeight: '800', paddingHorizontal: 15, borderRightWidth: StyleSheet.hairlineWidth, lineHeight: 54 },
   phoneInput: { flex: 1, fontSize: 17, fontWeight: '700', paddingHorizontal: 14, letterSpacing: 1 },
   demoBanner: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, marginBottom: 14 },
   demoText: { fontSize: 12.5, fontWeight: '700', flex: 1 },
   otpInput: { height: 56, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, fontSize: 26, fontWeight: '800', textAlign: 'center', letterSpacing: 12 },
-  cta: { alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 14, marginTop: 20 },
+  cta: { alignItems: 'center', justifyContent: 'center', height: 54, borderRadius: 14, marginTop: 20 },
   ctaText: { fontSize: 16, fontWeight: '800' },
 });

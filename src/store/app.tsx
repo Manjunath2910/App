@@ -36,6 +36,9 @@ type AppState = {
   user: User | null;
   signIn: (u: User) => void;
   signOut: () => void;
+  myPosts: Article[];
+  addPost: (a: Article) => void;
+  removePost: (id: string) => void;
 };
 
 const FONT_STEPS = [1, 1.12, 1.26];
@@ -50,6 +53,7 @@ const LANG_KEY = 'mb:lang';
 const STATS_KEY = 'mb:stats';
 const REMINDER_KEY = 'mb:reminder';
 const USER_KEY = 'mb:user';
+const POSTS_KEY = 'mb:posts';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const yesterdayStr = () => new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -66,12 +70,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [stats, setStats] = useState<Stats>({ read: 0, streak: 0, lastRead: '' });
   const [reminderOn, setReminderOnState] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [myPosts, setMyPosts] = useState<Article[]>([]);
 
   // Load persisted settings once.
   useEffect(() => {
     (async () => {
       try {
-        const [m, b, f, i, l, s, r, u] = await Promise.all([
+        const [m, b, f, i, l, s, r, u, p] = await Promise.all([
           AsyncStorage.getItem(MODE_KEY),
           AsyncStorage.getItem(BOOKMARKS_KEY),
           AsyncStorage.getItem(FONT_KEY),
@@ -80,6 +85,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STATS_KEY),
           AsyncStorage.getItem(REMINDER_KEY),
           AsyncStorage.getItem(USER_KEY),
+          AsyncStorage.getItem(POSTS_KEY),
         ]);
         if (m === 'light' || m === 'dark' || m === 'system') setModeState(m);
         if (b) setBookmarks(JSON.parse(b));
@@ -89,6 +95,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (s) setStats(JSON.parse(s));
         if (r === '1') setReminderOnState(true);
         if (u) setUser(JSON.parse(u));
+        if (p) setMyPosts(JSON.parse(p));
       } catch {
         // ignore — first run
       }
@@ -145,6 +152,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.removeItem(USER_KEY).catch(() => {});
   }, []);
 
+  const addPost = useCallback((a: Article) => {
+    setMyPosts((prev) => {
+      const next = [a, ...prev];
+      AsyncStorage.setItem(POSTS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const removePost = useCallback((id: string) => {
+    setMyPosts((prev) => {
+      const next = prev.filter((x) => x.id !== id);
+      AsyncStorage.setItem(POSTS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
   // Count a read and keep a daily streak going.
   const recordRead = useCallback(() => {
     setStats((prev) => {
@@ -196,11 +219,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       user,
       signIn,
       signOut,
+      myPosts,
+      addPost,
+      removePost,
     }),
     [
       palette, isDark, mode, setMode, bookmarks, toggleBookmark, category, article, openArticle,
       fontScale, cycleFontScale, interests, toggleInterest, lang, setLang, stats, reminderOn, setReminderOn,
-      user, signIn, signOut,
+      user, signIn, signOut, myPosts, addPost, removePost,
     ],
   );
 

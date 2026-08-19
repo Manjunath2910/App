@@ -63,6 +63,7 @@ export const ACCENTS: Record<string, string> = {
   AI: '#7C3AED',
   'E-commerce': '#F59E0B',
   Markets: '#16A34A',
+  Blogs: '#A21563',
 };
 
 const FALLBACK: Record<string, string> = {
@@ -74,6 +75,7 @@ const FALLBACK: Record<string, string> = {
   AI: 'photo-1677442136019-21780ecad995',
   'E-commerce': 'photo-1441986300917-64674bd600d8',
   Markets: 'photo-1611974789855-9c2a0a7236a3',
+  Blogs: 'photo-1526304640581-d334cdbbf45e',
 };
 
 export function fallbackImage(category: string): string {

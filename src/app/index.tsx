@@ -5,9 +5,11 @@ import { ActivityIndicator, Animated, FlatList, Pressable, RefreshControl, Scrol
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CategoryMenu from '@/components/CategoryMenu';
+import ComposeArticle from '@/components/ComposeArticle';
 import NewsCard from '@/components/NewsCard';
 import { ARTICLES, type Article } from '@/data/news';
 import { MY_ARTICLES } from '@/data/myArticles';
+import { fetchBlogs } from '@/data/blogs';
 import { fetchNews } from '@/data/remote';
 import { useT } from '@/i18n';
 import { useApp } from '@/store/app';
@@ -21,13 +23,16 @@ type StripTab = { key: string; label: string; kind: 'feed' | 'all' | 'videos' | 
 const AList: any = Animated.FlatList;
 
 export default function Feed() {
-  const { palette, category, setCategory, isDark, setMode, interests } = useApp();
+  const { palette, category, setCategory, isDark, setMode, interests, myPosts } = useApp();
   const t = useT();
   const insets = useSafeAreaInsets();
   const [h, setH] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
   const [live, setLive] = useState<Article[] | null>(null); // live backend articles
+  const [blogs, setBlogs] = useState<Article[]>([]); // ZoltMoney blog posts
+  const [blogsLoading, setBlogsLoading] = useState(true);
   const [seed, setSeed] = useState(0); // reshuffle trigger for the offline fallback
   const [loadingMore, setLoadingMore] = useState(false);
   const [tab, setTab] = useState<string>('My Feed');
@@ -35,11 +40,14 @@ export default function Feed() {
   const listRef = useRef<FlatList<Article>>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // Load live news on mount; mix in your own stories so refresh can reshuffle all.
+  // Load live news + ZoltMoney blogs on mount.
   useEffect(() => {
     fetchNews().then((a) => {
       if (a.length) setLive([...MY_ARTICLES, ...a]);
     });
+    fetchBlogs()
+      .then((b) => b.length && setBlogs(b))
+      .finally(() => setBlogsLoading(false));
   }, []);
 
   // When another screen changes the category (menu / discover), follow it.
@@ -66,14 +74,16 @@ export default function Feed() {
   );
 
   const data = useMemo(() => {
-    const src = live ?? (seed > 0 ? shuffle(ARTICLES) : ARTICLES);
-    if (tab === 'My Feed') return interests.length ? src.filter((a) => interests.includes(a.category)) : src;
+    // Your own posts first, then blogs + live/bundled news.
+    const src = [...myPosts, ...blogs, ...(live ?? (seed > 0 ? shuffle(ARTICLES) : ARTICLES))];
+    // My Feed = only ZoltMoney blogs + your own articles.
+    if (tab === 'My Feed') return [...myPosts, ...blogs];
     if (tab === 'All') return src;
     if (tab === 'Videos') return src.filter((a) => a.videoUrl);
-    if (tab === 'Marketing News') return src.filter((a) => a.category !== 'Markets');
+    if (tab === 'Marketing News') return src.filter((a) => a.category !== 'Markets' && a.category !== 'Blogs');
     if (tab === 'Rate News' || tab === 'Finance') return src.filter((a) => a.category === 'Markets');
     return src.filter((a) => a.category === tab);
-  }, [live, seed, tab, interests]);
+  }, [live, blogs, seed, tab, interests, myPosts]);
 
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
@@ -81,6 +91,7 @@ export default function Feed() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    fetchBlogs().then((b) => b.length && setBlogs(b)); // refresh blogs too
     const a = await fetchNews();
     // Always reshuffle everything so a genuinely new story lands on top — works
     // whether or not the fetch returned anything new.
@@ -125,6 +136,9 @@ export default function Feed() {
         </View>
 
         <View style={styles.rightActions}>
+          <Pressable onPress={() => setComposeOpen(true)} hitSlop={8} style={styles.edgeBtn}>
+            <Ionicons name="create-outline" size={21} color={palette.text} />
+          </Pressable>
           <Pressable onPress={() => setMode(isDark ? 'light' : 'dark')} hitSlop={8} style={styles.edgeBtn}>
             <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={20} color={palette.text} />
           </Pressable>
@@ -208,7 +222,14 @@ export default function Feed() {
             onEndReachedThreshold={1.2}
             ListEmptyComponent={
               <View style={[styles.empty, { height: h }]}>
-                <Text style={{ color: palette.textMuted }}>{t('emptyCategory')}</Text>
+                {blogsLoading ? (
+                  <>
+                    <ActivityIndicator color={palette.accent} />
+                    <Text style={{ color: palette.textMuted, marginTop: 12 }}>Loading ZoltMoney blogs…</Text>
+                  </>
+                ) : (
+                  <Text style={{ color: palette.textMuted }}>{t('emptyCategory')}</Text>
+                )}
               </View>
             }
             refreshControl={
@@ -227,6 +248,7 @@ export default function Feed() {
       </View>
 
       <CategoryMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
+      <ComposeArticle visible={composeOpen} onClose={() => setComposeOpen(false)} />
     </View>
   );
 }

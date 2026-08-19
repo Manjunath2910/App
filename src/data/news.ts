@@ -15,10 +15,12 @@ export type Category =
   | 'Branding'
   | 'AI'
   | 'E-commerce'
-  | 'Markets';
+  | 'Markets'
+  | 'Blogs';
 
 export const CATEGORIES: Category[] = [
   'All',
+  'Blogs',
   'Markets',
   'Digital',
   'Social Media',

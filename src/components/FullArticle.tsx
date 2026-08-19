@@ -4,9 +4,11 @@
 // and a "More stories" related list.
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { fetchBlogContent } from '@/data/blogs';
 import { ARTICLES, timeAgo } from '@/data/news';
 import { useApp } from '@/store/app';
 import { openUrl } from '@/utils/openUrl';
@@ -29,6 +31,15 @@ export default function FullArticle() {
   const insets = useSafeAreaInsets();
   const visible = Boolean(article);
   const saved = article ? isBookmarked(article.id) : false;
+
+  // Blogs load only a summary in the list; fetch the full body when opened.
+  const [blogBody, setBlogBody] = useState<string | null>(null);
+  useEffect(() => {
+    setBlogBody(null);
+    if (article && article.id.startsWith('blog-')) {
+      fetchBlogContent(article.id).then((c) => c && setBlogBody(c));
+    }
+  }, [article]);
 
   const openSource = () => {
     if (!article) return;
@@ -101,7 +112,7 @@ export default function FullArticle() {
 
               <View style={[styles.rule, { backgroundColor: palette.border }]} />
 
-              <Text style={[styles.content, { color: bodyText, fontSize: 16 * fs, lineHeight: 26 * fs }]}>{article.content}</Text>
+              <Text style={[styles.content, { color: bodyText, fontSize: 16 * fs, lineHeight: 26 * fs }]}>{blogBody || article.content}</Text>
 
               {/* Read at source */}
               <Pressable onPress={openSource} style={[styles.sourceBtn, { backgroundColor: article.accent }]}>
