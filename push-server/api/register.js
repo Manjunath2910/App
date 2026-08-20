@@ -1,6 +1,16 @@
 // POST /api/register  { token: "ExponentPushToken[...]" }
 // Stores the device's Expo push token in Upstash Redis (a set, so no dupes).
-import { redis, redisConfigured } from './_redis.js';
+const R_URL = process.env.UPSTASH_REDIS_REST_URL;
+const R_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+async function redis(command) {
+  const res = await fetch(R_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${R_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(command),
+  });
+  return res.json();
+}
 
 function isExpoPushToken(token) {
   return (
@@ -10,7 +20,6 @@ function isExpoPushToken(token) {
 }
 
 export default async function handler(req, res) {
-  // CORS (harmless; lets the web build register too).
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -19,7 +28,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'Method not allowed' });
   }
-  if (!redisConfigured()) {
+  if (!R_URL || !R_TOKEN) {
     return res.status(500).json({ ok: false, error: 'Storage not configured' });
   }
 
@@ -32,7 +41,6 @@ export default async function handler(req, res) {
     }
   }
   const token = body?.token;
-
   if (!isExpoPushToken(token)) {
     return res.status(400).json({ ok: false, error: 'Invalid Expo push token' });
   }

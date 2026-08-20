@@ -1,8 +1,17 @@
 // GET /api/check?key=YOUR_SECRET
-// Polls the ZoltMoney blog for the newest post; if it's new since last time,
-// sends an Expo push to every registered token. Trigger this every ~5 min with
-// a free external cron (cron-job.org) or Vercel Cron. Safe to call repeatedly.
-import { redis, redisConfigured } from './_redis.js';
+// Polls the ZoltMoney blog; if the newest post is new since last time, sends an
+// Expo push to every registered token. Trigger every ~5 min with a free cron.
+const R_URL = process.env.UPSTASH_REDIS_REST_URL;
+const R_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+async function redis(command) {
+  const res = await fetch(R_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${R_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(command),
+  });
+  return res.json();
+}
 
 const BLOG_URL =
   'https://blogs.getpanda.money/wp-json/wp/v2/posts?per_page=1&_fields=id,title,link';
@@ -64,7 +73,8 @@ async function sendPush(tokens, title, link) {
 }
 
 export default async function handler(req, res) {
-  // Optional protection: if CRON_SECRET is set, require it via ?key= or Bearer.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
   const secret = process.env.CRON_SECRET;
   if (secret) {
     const key = req.query?.key;
@@ -73,7 +83,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ ok: false, error: 'Unauthorized' });
     }
   }
-  if (!redisConfigured()) {
+  if (!R_URL || !R_TOKEN) {
     return res.status(500).json({ ok: false, error: 'Storage not configured' });
   }
 
@@ -91,7 +101,6 @@ export default async function handler(req, res) {
     const lastRes = await redis(['GET', 'lastPostId']);
     const lastPostId = lastRes?.result != null ? Number(lastRes.result) : null;
 
-    // First ever run: baseline, don't notify.
     if (lastPostId === null || Number.isNaN(lastPostId)) {
       await redis(['SET', 'lastPostId', String(newestId)]);
       return res.json({ ok: true, baseline: newestId });

@@ -1,9 +1,19 @@
 // GET /api  -> quick health/status check.
-import { redis, redisConfigured } from './_redis.js';
+const R_URL = process.env.UPSTASH_REDIS_REST_URL;
+const R_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+async function redis(command) {
+  const res = await fetch(R_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${R_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(command),
+  });
+  return res.json();
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  if (!redisConfigured()) {
+  if (!R_URL || !R_TOKEN) {
     return res.json({ status: 'running', storage: 'not-configured' });
   }
   try {
