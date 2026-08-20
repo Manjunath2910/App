@@ -1,9 +1,7 @@
 {
   "name": "mini-shorts-push-server",
   "version": "1.0.0",
-  "description": "Watches the ZoltMoney blog and sends Expo push notifications when a new post is published.",
+  "description": "Vercel serverless functions: register Expo push tokens and notify devices on new ZoltMoney blog posts.",
   "type": "module",
-  "main": "index.js",
-  "scripts": { "start": "node index.js" },
-  "dependencies": { "express": "^4.19.2" }
+  "private": true
 }
