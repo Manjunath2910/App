@@ -38,6 +38,7 @@ export default function Feed() {
   const didMount = useRef(false);
   const listRef = useRef<FlatList<Article>>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const refreshingRef = useRef(false);
 
   // Load live news + ZoltMoney blogs on mount.
   useEffect(() => {
@@ -87,15 +88,21 @@ export default function Feed() {
   }, [tab]);
 
   const onRefresh = useCallback(async () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
     setRefreshing(true);
-    fetchBlogs().then((b) => b.length && setBlogs(b)); // refresh blogs too
-    const a = await fetchNews();
-    // Always reshuffle everything so a genuinely new story lands on top — works
-    // whether or not the fetch returned anything new.
-    setLive((prev) => shuffle(a.length ? [...MY_ARTICLES, ...a] : (prev ?? ARTICLES)));
-    setSeed((s) => s + 1);
-    listRef.current?.scrollToOffset({ offset: 0, animated: true });
-    setRefreshing(false);
+    try {
+      fetchBlogs().then((b) => b.length && setBlogs(b)); // refresh blogs too
+      const a = await fetchNews();
+      // Always reshuffle everything so a genuinely new story lands on top — works
+      // whether or not the fetch returned anything new.
+      setLive((prev) => shuffle(a.length ? [...MY_ARTICLES, ...a] : (prev ?? ARTICLES)));
+      setSeed((s) => s + 1);
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    } finally {
+      setRefreshing(false);
+      refreshingRef.current = false;
+    }
   }, []);
 
   // Endless feed: as you scroll down, keep appending fresh stories. New ones
@@ -203,7 +210,17 @@ export default function Feed() {
             decelerationRate="fast"
             showsVerticalScrollIndicator={false}
             getItemLayout={(_: unknown, index: number) => ({ length: h, offset: h * index, index })}
-            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+              useNativeDriver: true,
+              // Pull the top card down past ~80px to trigger a refresh (works even
+              // when the paging snap eats the native RefreshControl gesture).
+              listener: (e: any) => {
+                const y = e?.nativeEvent?.contentOffset?.y ?? 0;
+                if (y < -80 && !refreshingRef.current) onRefresh();
+              },
+            })}
+            bounces
+            alwaysBounceVertical
             scrollEventThrottle={16}
             windowSize={5}
             maxToRenderPerBatch={3}
