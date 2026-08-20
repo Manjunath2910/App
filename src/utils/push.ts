@@ -31,7 +31,7 @@ export async function registerForPush(): Promise<void> {
     const token = tokenRes?.data;
     if (!token) return;
 
-    await fetch(`${PUSH_SERVER.replace(/\/$/, '')}/register`, {
+    await fetch(`${PUSH_SERVER.replace(/\/$/, '')}/api/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),

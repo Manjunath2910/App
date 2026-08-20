@@ -1,60 +1,56 @@
-# Mini Shorts Push Server
+# Mini Shorts push notifications — Vercel setup
 
-A tiny Node.js (Express) service that watches the ZoltMoney WordPress blog and
-sends **Expo push notifications** to registered devices whenever a new blog post
-is published.
+This sends a push ("New on Mini Shorts: …") to every app user whenever a new
+ZoltMoney blog post is published.
 
-## What it does
-
-- Stores registered Expo push tokens and the last-seen post id in a local
-  `data.json` file (created automatically, survives restarts).
-- Polls `https://blogs.getpanda.money/wp-json/wp/v2/posts` every 5 minutes for
-  the newest post (plus once ~10 seconds after startup).
-- On the first successful check it just records the current newest post (so it
-  doesn't blast everyone on boot). After that, any newer post triggers a push to
-  every registered device.
-- Removes tokens that Expo reports as `DeviceNotRegistered`.
-
-Only dependency: `express`. Requires **Node 18+** (uses the built-in global
-`fetch`).
-
-## Run locally
-
-```bash
-npm install
-npm start
-```
-
-The server listens on `http://localhost:4000` (or `PORT` if set) and logs when
-it detects new posts and sends notifications.
+On Vercel it runs as **serverless functions** (in `api/`) with **Upstash Redis**
+for storage (both free). A free external cron pings the check endpoint every
+5 minutes.
 
 ## Endpoints
+- `POST /api/register` — the app calls this on startup to save its push token.
+- `GET  /api/check?key=SECRET` — polls the blog; notifies on a new post. Trigger every ~5 min.
+- `GET  /api` — health/status.
 
-| Method | Path        | Description |
-| ------ | ----------- | ----------- |
-| `POST` | `/register` | Body `{ "token": "ExponentPushToken[...]" }`. Registers a device. Responds `{ ok: true, count }`. |
-| `GET`  | `/`         | Status JSON: `{ status: "running", tokens, lastPostId }`. |
+---
 
-## Deploy free on Render
+## 1. Deploy on Vercel
+- New Project → import your repo → **Root Directory: `push-server`**.
+- **Framework Preset: Other** (not Express).
+- Build Command: none · Output Directory: none · Install Command: `npm install`.
+- Deploy. You'll get a URL like `https://push-server-xxxx.vercel.app`.
 
-1. Push this project to a Git repo (or use Render's manual upload).
-2. In Render, choose **New → Web Service** and connect the repo (or upload it).
-3. Set the **Root Directory** to `push-server`.
-4. **Build Command:** `npm install`
-5. **Start Command:** `npm start`
-6. Deploy. Render automatically injects the `PORT` environment variable, which
-   this server already reads, so no extra configuration is needed.
+## 2. Add free storage (Upstash Redis)
+- In your Vercel project → **Storage** tab → **Marketplace → Upstash → Redis** → create a free database and connect it to this project.
+- This auto-adds `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` env vars.
+- (Manual alt: create a DB at upstash.com and paste those two values into Vercel → Settings → Environment Variables.)
 
-**Railway** works the same way: create a new service from the repo, set the root
-directory to `push-server`, and use the same build/start commands. Railway also
-sets `PORT` for you.
+## 3. Add a secret (protects the check endpoint)
+- Vercel → project → **Settings → Environment Variables** → add
+  `CRON_SECRET` = any long random string (e.g. `ms_9f3k2p...`).
+- **Redeploy** after adding env vars so they take effect.
 
-## After deploying
+## 4. Run the 5-minute check (free external cron)
+Vercel Hobby crons only run once/day, so use a free pinger for 5-min checks:
+- Go to **https://cron-job.org** → create a free account → **Create cronjob**.
+- URL: `https://YOUR-URL.vercel.app/api/check?key=YOUR_CRON_SECRET`
+- Schedule: every 5 minutes. Save + enable.
 
-1. Copy your service's public URL (e.g. `https://your-service.onrender.com`).
-2. Open the app's `src/utils/push.ts` and set the `PUSH_SERVER` constant to that
-   URL.
+(A once-daily Vercel cron is already configured in `vercel.json` as a backup.)
 
-That's it. In a real build, devices call `POST /register` with their Expo push
-token automatically when the app starts, so the server always has an up-to-date
-list of who to notify.
+## 5. Point the app at this server
+- In `src/utils/push.ts`, set:
+  `export const PUSH_SERVER: string = 'https://YOUR-URL.vercel.app';`
+- Rebuild the dev build:
+  `npx eas build --profile development --platform android`
+- Install it. Devices now register automatically on launch.
+
+## Test it
+- Open `https://YOUR-URL.vercel.app/api` → should show `tokens` count rising after you open the app on a device.
+- Publish a test post on ZoltMoney → within ~5 min every device gets the alert.
+- First check just sets a baseline (no alert); alerts start from the next new post.
+
+---
+
+`index.js` is the original always-on version (for hosts like Render/Railway).
+Vercel uses the `api/` functions and ignores it.
