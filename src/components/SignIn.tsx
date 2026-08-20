@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useT } from '@/i18n';
 import { useApp, type User } from '@/store/app';
-import { authReady, confirmOtp, sendOtp, signInWithGoogle } from '@/services/auth';
+import { authReady, confirmOtp, sendOtp, signInWithFacebook, signInWithGoogle } from '@/services/auth';
 
 type Props = { visible: boolean; onClose: () => void; onSuccess?: () => void };
 type Step = 'options' | 'phone' | 'otp';
@@ -46,7 +46,9 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
     onClose();
   };
 
-  // Google — real on device, demo on web preview.
+  const NEEDS_APP = 'Please open the Mini Shorts app on your phone to sign in.';
+
+  // Google — real Firebase sign-in only (no demo).
   const onGoogle = async () => {
     setError('');
     setBusy(true);
@@ -55,28 +57,28 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
       done(u);
     } catch (e: any) {
       if (e?.message === 'web-preview') {
-        done({ name: 'Google account', email: '' });
+        setError(NEEDS_APP);
       } else if (String(e?.code).includes('cancel') || String(e?.message).toLowerCase().includes('cancel')) {
         // user closed the Google sheet — do nothing
       } else {
-        setError('Google sign-in failed. Make sure the app’s SHA-1 is added in Firebase.');
+        setError('Google sign-in failed. Please try again.');
       }
     } finally {
       setBusy(false);
     }
   };
 
-  // Phone — send real OTP on device, demo on web preview.
+  // Phone — send a REAL OTP via SMS (no demo).
   const onSendCode = async () => {
     setError('');
+    if (!authReady()) {
+      setError(NEEDS_APP);
+      return;
+    }
     setBusy(true);
     try {
-      if (authReady()) {
-        const conf = await sendOtp(`+91${phone}`);
-        setConfirmation(conf);
-      } else {
-        setConfirmation(null); // demo
-      }
+      const conf = await sendOtp(`+91${phone}`);
+      setConfirmation(conf);
       setStep('otp');
     } catch (e: any) {
       setError('Could not send the code. Check the number and try again.');
@@ -87,16 +89,36 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
 
   const onVerify = async () => {
     setError('');
+    if (!confirmation) {
+      setError(NEEDS_APP);
+      return;
+    }
     setBusy(true);
     try {
-      if (confirmation) {
-        const u = await confirmOtp(confirmation, otp);
-        done(u);
-      } else {
-        done({ name: `+91 ${phone}`, email: '' }); // demo
-      }
+      const u = await confirmOtp(confirmation, otp);
+      done(u);
     } catch (e: any) {
       setError('Wrong or expired code. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Facebook — real Firebase sign-in (wired once your Facebook App ID is set).
+  const onFacebook = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      const u = await signInWithFacebook();
+      done(u);
+    } catch (e: any) {
+      if (String(e?.message).toLowerCase().includes('cancel')) {
+        // user cancelled
+      } else if (e?.message === 'not-configured') {
+        setError('Facebook sign-in isn’t set up yet.');
+      } else {
+        setError('Facebook sign-in failed. Please try again.');
+      }
     } finally {
       setBusy(false);
     }
@@ -126,12 +148,12 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
                 <Text style={[styles.btnText, { color: palette.text }]}>Sign in with google</Text>
               </Pressable>
 
-              <Pressable onPress={() => done({ name: 'Facebook account', email: '' })} disabled={busy} style={[styles.btn, { backgroundColor: '#1877F2' }]}>
+              <Pressable onPress={onFacebook} disabled={busy} style={[styles.btn, { backgroundColor: '#1877F2' }]}>
                 <Ionicons name="logo-facebook" size={20} color="#fff" />
                 <Text style={[styles.btnText, { color: '#fff' }]}>Sign in with facebook</Text>
               </Pressable>
 
-              <Pressable onPress={() => done({ name: 'Apple account', email: '' })} disabled={busy} style={[styles.btn, { backgroundColor: '#000' }]}>
+              <Pressable onPress={() => setError('Apple sign-in works on iPhone (needs an Apple Developer account).')} disabled={busy} style={[styles.btn, { backgroundColor: '#000' }]}>
                 <Ionicons name="logo-apple" size={21} color="#fff" />
                 <Text style={[styles.btnText, { color: '#fff' }]}>Sign in with apple</Text>
               </Pressable>

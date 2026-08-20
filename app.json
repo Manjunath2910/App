@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "icon": "./assets/images/ios-icon.png"
+      "icon": "./assets/images/ios-icon.png",
+      "bundleIdentifier": "com.manjunath2910.marketbrief"
     },
     "android": {
       "adaptiveIcon": {

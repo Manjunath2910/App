@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CategoryMenu from '@/components/CategoryMenu';
@@ -138,13 +138,6 @@ export default function Feed() {
           </Pressable>
           <Pressable onPress={() => setMode(isDark ? 'light' : 'dark')} hitSlop={8} style={styles.edgeBtn}>
             <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={20} color={palette.text} />
-          </Pressable>
-          <Pressable onPress={onRefresh} disabled={refreshing} hitSlop={8} style={styles.edgeBtn}>
-            {refreshing ? (
-              <ActivityIndicator size="small" color={palette.accent} />
-            ) : (
-              <Ionicons name="refresh" size={21} color={palette.text} />
-            )}
           </Pressable>
         </View>
       </View>

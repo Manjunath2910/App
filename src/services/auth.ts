@@ -54,6 +54,15 @@ export async function signInWithGoogle(): Promise<AuthUser> {
   return { name: u.displayName || 'Google user', email: u.email || '' };
 }
 
+// ── Facebook ──────────────────────────────────────────────────────────────────
+// Real Facebook login is enabled once your Facebook App ID is configured
+// (adds react-native-fbsdk-next + native config). Until then this throws
+// 'not-configured' so the button shows a friendly message instead of faking a login.
+export async function signInWithFacebook(): Promise<AuthUser> {
+  if (!ensureNative()) throw new Error('web-preview');
+  throw new Error('not-configured');
+}
+
 // ── Phone OTP ─────────────────────────────────────────────────────────────────
 // Returns a confirmation object; pass it to confirmOtp() with the typed code.
 export async function sendOtp(phoneE164: string): Promise<any> {
