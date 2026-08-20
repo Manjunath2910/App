@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CategoryMenu from '@/components/CategoryMenu';
@@ -39,6 +39,33 @@ export default function Feed() {
   const listRef = useRef<FlatList<Article>>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const refreshingRef = useRef(false);
+  // Custom pull-to-refresh (works on web too, where RN's RefreshControl doesn't).
+  const atTopRef = useRef(true);
+  const startYRef = useRef(0);
+  const pullRef = useRef(0);
+  const [pull, setPull] = useState(0);
+  const setPullVal = (v: number) => {
+    pullRef.current = v;
+    setPull(v);
+  };
+  const touchY = (e: any) => {
+    const ne = e?.nativeEvent ?? {};
+    if (ne.touches?.length) return ne.touches[0].clientY ?? ne.touches[0].pageY ?? 0;
+    if (ne.changedTouches?.length) return ne.changedTouches[0].clientY ?? ne.changedTouches[0].pageY ?? 0;
+    return ne.pageY ?? 0;
+  };
+  const onTouchStart = (e: any) => {
+    startYRef.current = touchY(e);
+  };
+  const onTouchMove = (e: any) => {
+    if (refreshingRef.current || !atTopRef.current) return;
+    const dy = touchY(e) - startYRef.current;
+    if (dy > 0) setPullVal(Math.min(dy * 0.55, 90));
+  };
+  const onTouchEnd = () => {
+    if (pullRef.current >= 55 && !refreshingRef.current) onRefresh();
+    setPullVal(0);
+  };
 
   // Load live news + ZoltMoney blogs on mount.
   useEffect(() => {
@@ -175,8 +202,22 @@ export default function Feed() {
         </ScrollView>
       </View>
 
-      {/* ── Paging feed (pull down or tap ↻ to refresh) ── */}
-      <View style={styles.feed} onLayout={(e) => setH(Math.round(e.nativeEvent.layout.height))}>
+      {/* ── Paging feed (pull down to refresh) ── */}
+      <View
+        style={[styles.feed, Platform.OS === 'web' ? ({ overscrollBehaviorY: 'contain' } as any) : null]}
+        onLayout={(e) => setH(Math.round(e.nativeEvent.layout.height))}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}>
+        {/* Pull spinner (shows while pulling or refreshing) */}
+        {(pull > 0 || refreshing) && (
+          <View pointerEvents="none" style={[styles.pullSpinner, { top: (refreshing ? 46 : pull) - 30 }]}>
+            <View style={[styles.pullDot, { backgroundColor: palette.card, borderColor: palette.border }]}>
+              <ActivityIndicator size="small" color={palette.accent} />
+            </View>
+          </View>
+        )}
         {h > 0 && (
           <AList
             ref={listRef}
@@ -216,6 +257,7 @@ export default function Feed() {
               // when the paging snap eats the native RefreshControl gesture).
               listener: (e: any) => {
                 const y = e?.nativeEvent?.contentOffset?.y ?? 0;
+                atTopRef.current = y <= 2;
                 if (y < -80 && !refreshingRef.current) onRefresh();
               },
             })}
@@ -288,5 +330,19 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 14.5, fontWeight: '800', letterSpacing: -0.2 },
   tabInd: { height: 3, alignSelf: 'stretch', borderRadius: 2, marginTop: 9, backgroundColor: 'transparent' },
   feed: { flex: 1 },
+  pullSpinner: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 20 },
+  pullDot: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
   empty: { alignItems: 'center', justifyContent: 'center', padding: 40 },
 });
