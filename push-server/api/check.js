@@ -1,8 +1,8 @@
 // GET /api/check?key=YOUR_SECRET
 // Polls the ZoltMoney blog; if the newest post is new since last time, sends an
 // Expo push to every registered token. Trigger every ~5 min with a free cron.
-const R_URL = process.env.UPSTASH_REDIS_REST_URL;
-const R_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const R_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const R_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 
 async function redis(command) {
   const res = await fetch(R_URL, {

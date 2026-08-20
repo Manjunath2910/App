@@ -1,6 +1,6 @@
 // GET /api  -> quick health/status check.
-const R_URL = process.env.UPSTASH_REDIS_REST_URL;
-const R_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const R_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const R_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 
 async function redis(command) {
   const res = await fetch(R_URL, {
