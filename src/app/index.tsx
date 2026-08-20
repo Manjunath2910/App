@@ -15,6 +15,13 @@ import { useT } from '@/i18n';
 import { useApp } from '@/store/app';
 
 const shuffle = (arr: Article[]) => [...arr].sort(() => Math.random() - 0.5);
+// Rotate an array left by n (stable + deterministic) so refresh leads with a new item.
+const rotate = (arr: Article[], n: number) => {
+  const len = arr.length;
+  if (!len) return arr;
+  const k = ((n % len) + len) % len;
+  return [...arr.slice(k), ...arr.slice(0, k)];
+};
 
 // Inshorts-style top strip. Some tabs filter the feed; a couple open other screens.
 type StripTab = { key: string; label: string; kind: 'feed' | 'all' | 'videos' | 'cat' | 'marketing' | 'rates'; route?: string };
@@ -99,8 +106,12 @@ export default function Feed() {
   );
 
   const data = useMemo(() => {
-    // Your own posts first, then blogs + live/bundled news.
-    const src = [...myPosts, ...blogs, ...(live ?? (seed > 0 ? shuffle(ARTICLES) : ARTICLES))];
+    // Blogs + live/bundled news. On refresh (seed++), rotate so a *different*
+    // story leads each time — this is what makes new news appear on pull-down.
+    const body = [...blogs, ...(live ?? ARTICLES)];
+    const rotated = seed > 0 && body.length ? rotate(body, seed) : body;
+    // Your own posts stay pinned on top, then the rotated feed.
+    const src = [...myPosts, ...rotated];
     // My Feed = ZoltMoney blogs + your articles + all marketing news.
     if (tab === 'My Feed') return src;
     if (tab === 'All') return src;
