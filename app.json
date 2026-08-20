@@ -39,6 +39,18 @@
         }
       ],
       [
+        "react-native-fbsdk-next",
+        {
+          "appID": "27883026808002920",
+          "clientToken": "785a99c9c1c24596a253f99a8649bcf1",
+          "displayName": "Mini Shorts",
+          "scheme": "fb27883026808002920",
+          "advertiserIDCollectionEnabled": false,
+          "autoLogAppEventsEnabled": false,
+          "isAutoInitEnabled": true
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": { "useFrameworks": "static" }

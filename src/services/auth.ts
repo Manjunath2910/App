@@ -55,12 +55,26 @@ export async function signInWithGoogle(): Promise<AuthUser> {
 }
 
 // ── Facebook ──────────────────────────────────────────────────────────────────
-// Real Facebook login is enabled once your Facebook App ID is configured
-// (adds react-native-fbsdk-next + native config). Until then this throws
-// 'not-configured' so the button shows a friendly message instead of faking a login.
+// Real Facebook login via react-native-fbsdk-next → Firebase credential.
+let fbsdk: any = null;
+
 export async function signInWithFacebook(): Promise<AuthUser> {
   if (!ensureNative()) throw new Error('web-preview');
-  throw new Error('not-configured');
+  try {
+    if (!fbsdk) fbsdk = require('react-native-fbsdk-next');
+  } catch {
+    throw new Error('not-configured');
+  }
+  const { LoginManager, AccessToken } = fbsdk;
+  const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
+  if (result?.isCancelled) throw new Error('cancelled');
+  const data = await AccessToken.getCurrentAccessToken();
+  const accessToken = data?.accessToken?.toString?.() ?? data?.accessToken;
+  if (!accessToken) throw new Error('No Facebook access token');
+  const credential = authMod.FacebookAuthProvider.credential(accessToken);
+  const userCred = await authMod().signInWithCredential(credential);
+  const u = userCred.user;
+  return { name: u.displayName || 'Facebook user', email: u.email || '' };
 }
 
 // ── Phone OTP ─────────────────────────────────────────────────────────────────

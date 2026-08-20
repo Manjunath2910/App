@@ -12,4 +12,4 @@ export const firebaseConfig = {
 
 // Filled in as you enable providers (Authentication → Google → Web SDK config).
 export const GOOGLE_WEB_CLIENT_ID = '879745781493-69pejb7mp8rc12tj9no5tld02e0okbpp.apps.googleusercontent.com';
-export const FACEBOOK_APP_ID = '';
+export const FACEBOOK_APP_ID = '27883026808002920';
