@@ -6,8 +6,8 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-// ▶ After you deploy /push-server, paste its public URL here (e.g. Render URL).
-export const PUSH_SERVER: string = '';
+// Deployed push-server (Vercel). Devices register here and get notified on new blogs.
+export const PUSH_SERVER: string = 'https://push-server-ebon.vercel.app';
 
 export async function registerForPush(): Promise<void> {
   try {
