@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CategoryMenu from '@/components/CategoryMenu';
 import ComposeArticle from '@/components/ComposeArticle';
 import NewsCard from '@/components/NewsCard';
-import { ARTICLES, type Article } from '@/data/news';
+import { ARTICLES, timeAgo, type Article } from '@/data/news';
 import { MY_ARTICLES } from '@/data/myArticles';
 import { fetchBlogs, fetchBlogsFast, loadCachedBlogs } from '@/data/blogs';
 import { fetchNews } from '@/data/remote';
@@ -51,8 +51,8 @@ export default function Feed() {
   const [live, setLive] = useState<Article[] | null>(null); // live backend articles
   const [blogs, setBlogs] = useState<Article[]>([]); // ZoltMoney blog posts
   const [loadingMore, setLoadingMore] = useState(false);
-  // In-app "new stories" bell
-  const [arrivals, setArrivals] = useState<Article[]>([]);
+  // In-app "new stories" bell (each item stamped with when it arrived)
+  const [arrivals, setArrivals] = useState<Array<Article & { arrivedAt: number }>>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const seenRef = useRef<Set<string>>(new Set());
   const baselineRef = useRef(false);
@@ -99,8 +99,10 @@ export default function Feed() {
     }
     const fresh = list.filter((a) => a && a.id && !seenRef.current.has(a.id));
     if (fresh.length) {
+      const now = Date.now();
       fresh.forEach((a) => seenRef.current.add(a.id));
-      setArrivals((prev) => [...fresh, ...prev].slice(0, 40));
+      const stamped = fresh.map((a) => ({ ...a, arrivedAt: now }));
+      setArrivals((prev) => [...stamped, ...prev].slice(0, 40));
     }
   }, []);
 
@@ -311,7 +313,7 @@ export default function Feed() {
                       <Text style={[styles.notifRowTitle, { color: palette.text }]} numberOfLines={2}>
                         {item.title}
                       </Text>
-                      <Text style={[styles.notifRowMeta, { color: palette.textMuted }]}>{item.source}</Text>
+                      <Text style={[styles.notifRowMeta, { color: palette.textMuted }]}>{item.source} · {timeAgo(item.publishedAt)}</Text>
                     </View>
                   </Pressable>
                 )}
