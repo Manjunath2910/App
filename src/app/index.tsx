@@ -1,12 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, FlatList, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CategoryMenu from '@/components/CategoryMenu';
-import ComposeArticle from '@/components/ComposeArticle';
 import NewsCard from '@/components/NewsCard';
 import { ARTICLES, timeAgo, type Article } from '@/data/news';
 import { MY_ARTICLES } from '@/data/myArticles';
@@ -50,7 +49,6 @@ export default function Feed() {
   const [h, setH] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [composeOpen, setComposeOpen] = useState(false);
   const [live, setLive] = useState<Article[] | null>(null); // live backend articles
   const [blogs, setBlogs] = useState<Article[]>([]); // ZoltMoney blog posts
   const [loadingMore, setLoadingMore] = useState(false);
@@ -66,6 +64,8 @@ export default function Feed() {
   const listRef = useRef<FlatList<Article>>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const refreshingRef = useRef(false);
+  const lastHomeTapRef = useRef(0);
+  const navigation = useNavigation();
   // Custom pull-to-refresh (works on web too, where RN's RefreshControl doesn't).
   const atTopRef = useRef(true);
   const startYRef = useRef(0);
@@ -238,6 +238,16 @@ export default function Feed() {
     }
   }, [registerArticles, noteArrivals]);
 
+  // Double-tap the Home tab (bottom nav) to refresh.
+  useEffect(() => {
+    const unsub = (navigation as any)?.addListener?.('tabPress', () => {
+      const now = Date.now();
+      if (now - lastHomeTapRef.current < 320) onRefresh();
+      lastHomeTapRef.current = now;
+    });
+    return unsub;
+  }, [navigation, onRefresh]);
+
   // Endless feed: as you scroll down, keep appending fresh stories. New ones
   // from the live source come first; when exhausted we append a reshuffled
   // batch so the feed never dead-ends.
@@ -289,9 +299,6 @@ export default function Feed() {
                 <Text style={styles.badgeText}>{arrivals.length > 9 ? '9+' : arrivals.length}</Text>
               </View>
             )}
-          </Pressable>
-          <Pressable onPress={() => setComposeOpen(true)} hitSlop={8} style={styles.edgeBtn}>
-            <Ionicons name="create-outline" size={21} color={palette.text} />
           </Pressable>
           <Pressable onPress={() => setMode(isDark ? 'light' : 'dark')} hitSlop={8} style={styles.edgeBtn}>
             <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={20} color={palette.text} />
@@ -460,7 +467,6 @@ export default function Feed() {
       </View>
 
       <CategoryMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />
-      <ComposeArticle visible={composeOpen} onClose={() => setComposeOpen(false)} />
     </View>
   );
 }
