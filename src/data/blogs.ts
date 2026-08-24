@@ -3,12 +3,14 @@
 // Fallback: a light fetch (title + excerpt + image) so blogs always load even
 // when a web proxy can't handle the bigger responses. New posts appear
 // automatically (fetched newest-first on every load / refresh).
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 import { fallbackImage } from './liveFeeds';
 import type { Article } from './news';
 
 const WP = 'https://blogs.getpanda.money/wp-json/wp/v2/posts';
+const CACHE_KEY = 'mb:blogsCache';
 
 const WEB_PROXIES = [
   (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
@@ -82,15 +84,41 @@ function toArticle(p: any, full: string): Article {
   };
 }
 
+function cache(list: Article[]) {
+  if (list.length) AsyncStorage.setItem(CACHE_KEY, JSON.stringify(list.slice(0, 120))).catch(() => {});
+}
+
+// Instantly available: the last blogs we saved. Shown the moment the app opens
+// (no network wait), then refreshed by the fetches below.
+export async function loadCachedBlogs(): Promise<Article[]> {
+  try {
+    const raw = await AsyncStorage.getItem(CACHE_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+// FAST: light fetch (title + excerpt + image only) — small + quick, so blogs
+// appear almost immediately on open.
+export async function fetchBlogsFast(): Promise<Article[]> {
+  const posts = await fetchList('id,link,date,title,excerpt,jetpack_featured_media_url', 3, 40);
+  const list = posts.map((p) => toArticle(p, '')).filter((a) => a.title);
+  cache(list);
+  return list;
+}
+
+// FULLER: includes the body for ~110-word summaries. Runs in the background to
+// enrich what fetchBlogsFast already showed.
 export async function fetchBlogs(): Promise<Article[]> {
-  // Primary: fetch with the body too → fuller ~110-word summaries.
   let posts = await fetchList('id,link,date,title,excerpt,content,jetpack_featured_media_url', 4, 30);
-  // Fallback: light fetch (no body) so blogs still load if a proxy can't handle
-  // the bigger response. New posts appear automatically on every load / refresh.
   if (!posts.length) {
     posts = await fetchList('id,link,date,title,excerpt,jetpack_featured_media_url', 6, 100);
   }
-  return posts.map((p) => toArticle(p, stripHtml(p?.content?.rendered || ''))).filter((a) => a.title);
+  const list = posts.map((p) => toArticle(p, stripHtml(p?.content?.rendered || ''))).filter((a) => a.title);
+  cache(list);
+  return list;
 }
 
 // Full article body for one blog (used by the reader if the list came light).

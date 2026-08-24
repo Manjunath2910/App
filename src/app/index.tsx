@@ -9,7 +9,7 @@ import ComposeArticle from '@/components/ComposeArticle';
 import NewsCard from '@/components/NewsCard';
 import { ARTICLES, type Article } from '@/data/news';
 import { MY_ARTICLES } from '@/data/myArticles';
-import { fetchBlogs } from '@/data/blogs';
+import { fetchBlogs, fetchBlogsFast, loadCachedBlogs } from '@/data/blogs';
 import { fetchNews } from '@/data/remote';
 import { useT } from '@/i18n';
 import { useApp } from '@/store/app';
@@ -79,7 +79,20 @@ export default function Feed() {
     fetchNews().then((a) => {
       if (a.length) setLive([...MY_ARTICLES, ...a]);
     });
-    fetchBlogs().then((b) => b.length && setBlogs(b));
+    // Blogs, fastest → fullest so they appear the instant the app opens:
+    // 1) show last-saved blogs immediately (no network wait)
+    // 2) a quick light fetch for fresh titles/images
+    // 3) enrich with fuller ~110-word summaries in the background
+    loadCachedBlogs().then((c) => {
+      if (c.length) setBlogs((prev) => (prev.length ? prev : c));
+    });
+    fetchBlogsFast()
+      .then((b) => {
+        if (b.length) setBlogs(b);
+      })
+      .finally(() => {
+        fetchBlogs().then((b) => b.length && setBlogs(b));
+      });
   }, []);
 
   // When another screen changes the category (menu / discover), follow it.
