@@ -15,12 +15,23 @@ import { useT } from '@/i18n';
 import { useApp } from '@/store/app';
 
 const shuffle = (arr: Article[]) => [...arr].sort(() => Math.random() - 0.5);
-// Rotate an array left by n (stable + deterministic) so refresh leads with a new item.
-const rotate = (arr: Article[], n: number) => {
-  const len = arr.length;
-  if (!len) return arr;
-  const k = ((n % len) + len) % len;
-  return [...arr.slice(k), ...arr.slice(0, k)];
+// Newest-first by publish date (missing dates sort last).
+const byNewest = (arr: Article[]) =>
+  [...arr].sort((a, b) => {
+    const ta = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+    const tb = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+    return tb - ta;
+  });
+// Interleave two lists with a weighting (na from a, then nb from b, repeat).
+const interleave = (a: Article[], b: Article[], na: number, nb: number) => {
+  const out: Article[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length || j < b.length) {
+    for (let k = 0; k < na && i < a.length; k++) out.push(a[i++]);
+    for (let k = 0; k < nb && j < b.length; k++) out.push(b[j++]);
+  }
+  return out;
 };
 
 // Inshorts-style top strip. Some tabs filter the feed; a couple open other screens.
@@ -39,7 +50,6 @@ export default function Feed() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [live, setLive] = useState<Article[] | null>(null); // live backend articles
   const [blogs, setBlogs] = useState<Article[]>([]); // ZoltMoney blog posts
-  const [seed, setSeed] = useState(0); // reshuffle trigger for the offline fallback
   const [loadingMore, setLoadingMore] = useState(false);
   const [tab, setTab] = useState<string>('My Feed');
   const didMount = useRef(false);
@@ -139,22 +149,20 @@ export default function Feed() {
   );
 
   const data = useMemo(() => {
-    // Blogs + live/bundled news. On refresh (seed++), rotate so a *different*
-    // story leads each time — this is what makes new news appear on pull-down.
-    const body = [...blogs, ...(live ?? ARTICLES)];
-    // Each refresh jumps several stories forward so a clearly different one leads
-    // (stable while scrolling — appended items go to the end, unaffected).
-    const rotated = seed > 0 && body.length ? rotate(body, seed * 9) : body;
-    // Your own posts stay pinned on top, then the rotated feed.
-    const src = [...myPosts, ...rotated];
-    // My Feed = ZoltMoney blogs + your articles + all marketing news.
-    if (tab === 'My Feed') return src;
-    if (tab === 'All') return src;
-    if (tab === 'Videos') return src.filter((a) => a.videoUrl);
-    if (tab === 'Marketing News') return src.filter((a) => a.category !== 'Markets' && a.category !== 'Blogs');
-    if (tab === 'Rate News' || tab === 'Finance') return src.filter((a) => a.category === 'Markets');
-    return src.filter((a) => a.category === tab);
-  }, [live, blogs, seed, tab, interests, myPosts]);
+    // Newest first, always — so the feed leads with the latest / today's stories.
+    const blogsLatest = byNewest(blogs); // ZoltMoney
+    const newsLatest = byNewest(live ?? ARTICLES).filter((a) => a.category !== 'Blogs');
+
+    // My Feed / All: ZoltMoney-heavy mix (2 blogs : 1 news), both newest-first,
+    // so it's mostly ZoltMoney but still shows the latest other news of the day.
+    if (tab === 'My Feed' || tab === 'All') {
+      return [...myPosts, ...interleave(blogsLatest, newsLatest, 2, 1)];
+    }
+    if (tab === 'Videos') return byNewest([...blogsLatest, ...newsLatest]).filter((a) => a.videoUrl);
+    if (tab === 'Marketing News') return newsLatest.filter((a) => a.category !== 'Markets');
+    if (tab === 'Rate News' || tab === 'Finance') return newsLatest.filter((a) => a.category === 'Markets');
+    return byNewest([...myPosts, ...blogsLatest, ...newsLatest]).filter((a) => a.category === tab);
+  }, [live, blogs, tab, interests, myPosts]);
 
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
@@ -165,18 +173,24 @@ export default function Feed() {
     refreshingRef.current = true;
     setRefreshing(true);
     try {
-      fetchBlogs().then((b) => b.length && setBlogs(b)); // refresh blogs too
+      // Refetch blogs + news; newest items sort to the top automatically.
+      fetchBlogsFast().then((b) => {
+        if (b.length) {
+          setBlogs(b);
+          registerArticles(b);
+        }
+      });
       const a = await fetchNews();
-      // Always reshuffle everything so a genuinely new story lands on top — works
-      // whether or not the fetch returned anything new.
-      setLive((prev) => shuffle(a.length ? [...MY_ARTICLES, ...a] : (prev ?? ARTICLES)));
-      setSeed((s) => s + 1);
+      if (a.length) {
+        setLive([...MY_ARTICLES, ...a]);
+        registerArticles(a);
+      }
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
     } finally {
       setRefreshing(false);
       refreshingRef.current = false;
     }
-  }, []);
+  }, [registerArticles]);
 
   // Endless feed: as you scroll down, keep appending fresh stories. New ones
   // from the live source come first; when exhausted we append a reshuffled
