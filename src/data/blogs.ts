@@ -64,7 +64,9 @@ async function fetchList(fields: string, pages: number, perPage: number): Promis
 
 function toArticle(p: any, full: string): Article {
   const excerpt = stripHtml(p?.excerpt?.rendered || '');
-  const summary = firstWords(full || excerpt, 60) || excerpt || stripHtml(p?.title?.rendered || '');
+  // A fuller summary (~110 words) — more than the tiny excerpt, but still a
+  // summary, not the whole article.
+  const summary = firstWords(full || excerpt, 110) || excerpt || stripHtml(p?.title?.rendered || '');
   return {
     id: `blog-${p.id}`,
     category: 'Blogs',
@@ -81,10 +83,14 @@ function toArticle(p: any, full: string): Article {
 }
 
 export async function fetchBlogs(): Promise<Article[]> {
-  // Light fetch (title + excerpt + image) — small, fast, reliable. Loads every
-  // post; the reader shows this short summary. New posts appear automatically.
-  const posts = await fetchList('id,link,date,title,excerpt,jetpack_featured_media_url', 6, 100);
-  return posts.map((p) => toArticle(p, '')).filter((a) => a.title);
+  // Primary: fetch with the body too → fuller ~110-word summaries.
+  let posts = await fetchList('id,link,date,title,excerpt,content,jetpack_featured_media_url', 4, 30);
+  // Fallback: light fetch (no body) so blogs still load if a proxy can't handle
+  // the bigger response. New posts appear automatically on every load / refresh.
+  if (!posts.length) {
+    posts = await fetchList('id,link,date,title,excerpt,jetpack_featured_media_url', 6, 100);
+  }
+  return posts.map((p) => toArticle(p, stripHtml(p?.content?.rendered || ''))).filter((a) => a.title);
 }
 
 // Full article body for one blog (used by the reader if the list came light).
