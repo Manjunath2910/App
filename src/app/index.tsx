@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, FlatList, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -40,6 +41,8 @@ type StripTab = { key: string; label: string; kind: 'feed' | 'all' | 'videos' | 
 // Animated FlatList so each card can fade + scale as it swipes into view.
 const AList: any = Animated.FlatList;
 
+const NOTIF_SINCE_KEY = 'mb:notifSince'; // last time the user checked notifications
+
 export default function Feed() {
   const { palette, category, setCategory, isDark, setMode, interests, myPosts, registerArticles, openArticle } = useApp();
   const t = useT();
@@ -54,8 +57,10 @@ export default function Feed() {
   // In-app "new stories" bell (each item stamped with when it arrived)
   const [arrivals, setArrivals] = useState<Array<Article & { arrivedAt: number }>>([]);
   const [notifOpen, setNotifOpen] = useState(false);
-  const seenRef = useRef<Set<string>>(new Set());
-  const baselineRef = useRef(false);
+  const notifiedIdsRef = useRef<Set<string>>(new Set());
+  // Only notify for content published AFTER this time — set to "last time you
+  // checked". Default: last 24h, so today's ZoltMoney + news show on open.
+  const notifSinceRef = useRef<number>(Date.now() - 24 * 60 * 60 * 1000);
   const [tab, setTab] = useState<string>('My Feed');
   const didMount = useRef(false);
   const listRef = useRef<FlatList<Article>>(null);
@@ -89,33 +94,38 @@ export default function Feed() {
     setPullVal(0);
   };
 
-  // Track "new stories" for the bell. First few seconds = baseline (seed what's
-  // already here, no alert); after that, anything new lights the bell.
+  // Notify for any story (ZoltMoney or news) published since you last checked
+  // and within roughly the last day — so today's fresh content shows, old
+  // fetched posts don't. Treats ZoltMoney and news the same way.
   const noteArrivals = useCallback((list: Article[]) => {
     if (!list?.length) return;
-    if (!baselineRef.current) {
-      list.forEach((a) => a?.id && seenRef.current.add(a.id));
-      return;
-    }
     const now = Date.now();
-    const RECENT_MS = 30 * 60 * 60 * 1000; // ~today (last 30h)
-    const fresh = list.filter((a) => a && a.id && !seenRef.current.has(a.id));
-    // Mark everything fresh as seen so it won't re-trigger…
-    fresh.forEach((a) => seenRef.current.add(a.id));
-    // …but only *notify* for genuinely new content published recently (today),
-    // not older posts that merely got fetched now.
-    const recent = fresh.filter((a) => {
+    const RECENT_MS = 36 * 60 * 60 * 1000; // ~today
+    const since = notifSinceRef.current;
+    const add: Array<Article & { arrivedAt: number }> = [];
+    for (const a of list) {
+      if (!a || !a.id || notifiedIdsRef.current.has(a.id)) continue;
       const t = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
-      return t > 0 && now - t < RECENT_MS;
-    });
-    if (recent.length) {
-      const stamped = recent.map((a) => ({ ...a, arrivedAt: now }));
-      setArrivals((prev) => [...stamped, ...prev].slice(0, 40));
+      if (t > since && now - t < RECENT_MS) {
+        notifiedIdsRef.current.add(a.id);
+        add.push({ ...a, arrivedAt: now });
+      }
+    }
+    if (add.length) {
+      setArrivals((prev) =>
+        [...add, ...prev]
+          .sort((x, y) => new Date(y.publishedAt).getTime() - new Date(x.publishedAt).getTime())
+          .slice(0, 40),
+      );
     }
   }, []);
 
   // Load live news + ZoltMoney blogs on mount.
   useEffect(() => {
+    // Restore "last checked" time so we only alert on content newer than that.
+    AsyncStorage.getItem(NOTIF_SINCE_KEY).then((v) => {
+      if (v) notifSinceRef.current = Number(v);
+    });
     registerArticles([...MY_ARTICLES, ...ARTICLES]); // bundled/seed → searchable immediately
     fetchNews().then((a) => {
       if (a.length) {
@@ -152,11 +162,6 @@ export default function Feed() {
           }
         });
       });
-    // Everything loaded up to ~6s is the baseline; new items after that alert.
-    const tmr = setTimeout(() => {
-      baselineRef.current = true;
-    }, 6000);
-    return () => clearTimeout(tmr);
   }, []);
 
   // Keep your own posts searchable too.
@@ -268,7 +273,16 @@ export default function Feed() {
         </View>
 
         <View style={styles.rightActions}>
-          <Pressable onPress={() => setNotifOpen(true)} hitSlop={8} style={styles.edgeBtn}>
+          <Pressable
+            onPress={() => {
+              setNotifOpen(true);
+              // Mark as read: only newer content alerts next time.
+              const now = Date.now();
+              notifSinceRef.current = now;
+              AsyncStorage.setItem(NOTIF_SINCE_KEY, String(now)).catch(() => {});
+            }}
+            hitSlop={8}
+            style={styles.edgeBtn}>
             <Ionicons name={arrivals.length ? 'notifications' : 'notifications-outline'} size={21} color={arrivals.length ? palette.accent : palette.text} />
             {arrivals.length > 0 && (
               <View style={[styles.badge, { backgroundColor: palette.accent, borderColor: palette.bg }]}>
