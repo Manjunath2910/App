@@ -122,7 +122,9 @@ export default function Feed() {
     // Blogs + live/bundled news. On refresh (seed++), rotate so a *different*
     // story leads each time — this is what makes new news appear on pull-down.
     const body = [...blogs, ...(live ?? ARTICLES)];
-    const rotated = seed > 0 && body.length ? rotate(body, seed) : body;
+    // Each refresh jumps several stories forward so a clearly different one leads
+    // (stable while scrolling — appended items go to the end, unaffected).
+    const rotated = seed > 0 && body.length ? rotate(body, seed * 9) : body;
     // Your own posts stay pinned on top, then the rotated feed.
     const src = [...myPosts, ...rotated];
     // My Feed = ZoltMoney blogs + your articles + all marketing news.
@@ -227,15 +229,16 @@ export default function Feed() {
       </View>
 
       {/* ── Paging feed (pull down to refresh) ── */}
+      {/* Custom touch-pull only on web (RN's RefreshControl handles native, and
+          attaching these on native would fight the built-in pull gesture). */}
       <View
         style={[styles.feed, Platform.OS === 'web' ? ({ overscrollBehaviorY: 'contain' } as any) : null]}
         onLayout={(e) => setH(Math.round(e.nativeEvent.layout.height))}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onTouchCancel={onTouchEnd}>
-        {/* Pull spinner (shows while pulling or refreshing) */}
-        {(pull > 0 || refreshing) && (
+        {...(Platform.OS === 'web'
+          ? { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel: onTouchEnd }
+          : {})}>
+        {/* Pull spinner on web (native uses the OS RefreshControl spinner) */}
+        {Platform.OS === 'web' && (pull > 0 || refreshing) && (
           <View pointerEvents="none" style={[styles.pullSpinner, { top: (refreshing ? 46 : pull) - 30 }]}>
             <View style={[styles.pullDot, { backgroundColor: palette.card, borderColor: palette.border }]}>
               <ActivityIndicator size="small" color={palette.accent} />
