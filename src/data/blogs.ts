@@ -50,6 +50,12 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+// WordPress date_gmt has no timezone marker; append 'Z' so it parses as UTC.
+function normDate(gmt: any): string {
+  if (typeof gmt !== 'string' || !gmt) return '';
+  return /[zZ]|[+-]\d\d:?\d\d$/.test(gmt) ? gmt : `${gmt}Z`;
+}
+
 function firstWords(text: string, n: number): string {
   const w = text.split(' ').filter(Boolean);
   return w.length <= n ? text : w.slice(0, n).join(' ') + '…';
@@ -79,7 +85,9 @@ function toArticle(p: any, full: string): Article {
     source: 'ZoltMoney',
     author: 'ZoltMoney',
     url: typeof p?.link === 'string' ? p.link : 'https://zoltmoney.com/en/blogs/',
-    publishedAt: p?.date || new Date().toISOString(),
+    // Use the UTC date (date_gmt) so "x ago" is accurate on any device. WordPress
+    // returns it without a 'Z', so add one; fall back to local date/now.
+    publishedAt: normDate(p?.date_gmt) || p?.date || new Date().toISOString(),
     accent: '#A21563',
   };
 }
@@ -103,7 +111,7 @@ export async function loadCachedBlogs(): Promise<Article[]> {
 // FAST: light fetch (title + excerpt + image only) — small + quick, so blogs
 // appear almost immediately on open.
 export async function fetchBlogsFast(): Promise<Article[]> {
-  const posts = await fetchList('id,link,date,title,excerpt,jetpack_featured_media_url', 3, 40);
+  const posts = await fetchList('id,link,date,date_gmt,title,excerpt,jetpack_featured_media_url', 3, 40);
   const list = posts.map((p) => toArticle(p, '')).filter((a) => a.title);
   cache(list);
   return list;
@@ -112,9 +120,9 @@ export async function fetchBlogsFast(): Promise<Article[]> {
 // FULLER: includes the body for ~110-word summaries. Runs in the background to
 // enrich what fetchBlogsFast already showed.
 export async function fetchBlogs(): Promise<Article[]> {
-  let posts = await fetchList('id,link,date,title,excerpt,content,jetpack_featured_media_url', 4, 30);
+  let posts = await fetchList('id,link,date,date_gmt,title,excerpt,content,jetpack_featured_media_url', 4, 30);
   if (!posts.length) {
-    posts = await fetchList('id,link,date,title,excerpt,jetpack_featured_media_url', 6, 100);
+    posts = await fetchList('id,link,date,date_gmt,title,excerpt,jetpack_featured_media_url', 6, 100);
   }
   const list = posts.map((p) => toArticle(p, stripHtml(p?.content?.rendered || ''))).filter((a) => a.title);
   cache(list);
