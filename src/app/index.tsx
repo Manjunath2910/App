@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, FlatList, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CategoryMenu from '@/components/CategoryMenu';
@@ -41,7 +41,7 @@ type StripTab = { key: string; label: string; kind: 'feed' | 'all' | 'videos' | 
 const AList: any = Animated.FlatList;
 
 export default function Feed() {
-  const { palette, category, setCategory, isDark, setMode, interests, myPosts, registerArticles } = useApp();
+  const { palette, category, setCategory, isDark, setMode, interests, myPosts, registerArticles, openArticle } = useApp();
   const t = useT();
   const insets = useSafeAreaInsets();
   const [h, setH] = useState(0);
@@ -51,6 +51,11 @@ export default function Feed() {
   const [live, setLive] = useState<Article[] | null>(null); // live backend articles
   const [blogs, setBlogs] = useState<Article[]>([]); // ZoltMoney blog posts
   const [loadingMore, setLoadingMore] = useState(false);
+  // In-app "new stories" bell
+  const [arrivals, setArrivals] = useState<Article[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const seenRef = useRef<Set<string>>(new Set());
+  const baselineRef = useRef(false);
   const [tab, setTab] = useState<string>('My Feed');
   const didMount = useRef(false);
   const listRef = useRef<FlatList<Article>>(null);
@@ -84,6 +89,21 @@ export default function Feed() {
     setPullVal(0);
   };
 
+  // Track "new stories" for the bell. First few seconds = baseline (seed what's
+  // already here, no alert); after that, anything new lights the bell.
+  const noteArrivals = useCallback((list: Article[]) => {
+    if (!list?.length) return;
+    if (!baselineRef.current) {
+      list.forEach((a) => a?.id && seenRef.current.add(a.id));
+      return;
+    }
+    const fresh = list.filter((a) => a && a.id && !seenRef.current.has(a.id));
+    if (fresh.length) {
+      fresh.forEach((a) => seenRef.current.add(a.id));
+      setArrivals((prev) => [...fresh, ...prev].slice(0, 40));
+    }
+  }, []);
+
   // Load live news + ZoltMoney blogs on mount.
   useEffect(() => {
     registerArticles([...MY_ARTICLES, ...ARTICLES]); // bundled/seed → searchable immediately
@@ -91,6 +111,7 @@ export default function Feed() {
       if (a.length) {
         setLive([...MY_ARTICLES, ...a]);
         registerArticles(a);
+        noteArrivals(a);
       }
     });
     // Blogs, fastest → fullest so they appear the instant the app opens:
@@ -101,6 +122,7 @@ export default function Feed() {
       if (c.length) {
         setBlogs((prev) => (prev.length ? prev : c));
         registerArticles(c);
+        noteArrivals(c);
       }
     });
     fetchBlogsFast()
@@ -108,6 +130,7 @@ export default function Feed() {
         if (b.length) {
           setBlogs(b);
           registerArticles(b);
+          noteArrivals(b);
         }
       })
       .finally(() => {
@@ -115,9 +138,15 @@ export default function Feed() {
           if (b.length) {
             setBlogs(b);
             registerArticles(b);
+            noteArrivals(b);
           }
         });
       });
+    // Everything loaded up to ~6s is the baseline; new items after that alert.
+    const tmr = setTimeout(() => {
+      baselineRef.current = true;
+    }, 6000);
+    return () => clearTimeout(tmr);
   }, []);
 
   // Keep your own posts searchable too.
@@ -178,19 +207,21 @@ export default function Feed() {
         if (b.length) {
           setBlogs(b);
           registerArticles(b);
+          noteArrivals(b);
         }
       });
       const a = await fetchNews();
       if (a.length) {
         setLive([...MY_ARTICLES, ...a]);
         registerArticles(a);
+        noteArrivals(a);
       }
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
     } finally {
       setRefreshing(false);
       refreshingRef.current = false;
     }
-  }, [registerArticles]);
+  }, [registerArticles, noteArrivals]);
 
   // Endless feed: as you scroll down, keep appending fresh stories. New ones
   // from the live source come first; when exhausted we append a reshuffled
@@ -227,6 +258,14 @@ export default function Feed() {
         </View>
 
         <View style={styles.rightActions}>
+          <Pressable onPress={() => setNotifOpen(true)} hitSlop={8} style={styles.edgeBtn}>
+            <Ionicons name={arrivals.length ? 'notifications' : 'notifications-outline'} size={21} color={arrivals.length ? palette.accent : palette.text} />
+            {arrivals.length > 0 && (
+              <View style={[styles.badge, { backgroundColor: palette.accent, borderColor: palette.bg }]}>
+                <Text style={styles.badgeText}>{arrivals.length > 9 ? '9+' : arrivals.length}</Text>
+              </View>
+            )}
+          </Pressable>
           <Pressable onPress={() => setComposeOpen(true)} hitSlop={8} style={styles.edgeBtn}>
             <Ionicons name="create-outline" size={21} color={palette.text} />
           </Pressable>
@@ -235,6 +274,52 @@ export default function Feed() {
           </Pressable>
         </View>
       </View>
+
+      {/* ── New-stories notification panel ── */}
+      <Modal visible={notifOpen} transparent animationType="fade" onRequestClose={() => setNotifOpen(false)}>
+        <Pressable style={styles.notifBackdrop} onPress={() => setNotifOpen(false)}>
+          <Pressable style={[styles.notifSheet, { backgroundColor: palette.card, borderColor: palette.border, marginTop: insets.top + 54 }]}>
+            <View style={styles.notifHead}>
+              <Text style={[styles.notifTitle, { color: palette.text }]}>
+                {arrivals.length ? `${arrivals.length} new ${arrivals.length === 1 ? 'story' : 'stories'} arrived` : 'Notifications'}
+              </Text>
+              {arrivals.length > 0 && (
+                <Pressable onPress={() => setArrivals([])} hitSlop={8}>
+                  <Text style={[styles.notifClear, { color: palette.accent }]}>Clear</Text>
+                </Pressable>
+              )}
+            </View>
+            {arrivals.length === 0 ? (
+              <View style={styles.notifEmpty}>
+                <Ionicons name="notifications-off-outline" size={30} color={palette.textMuted} />
+                <Text style={{ color: palette.textMuted, marginTop: 8 }}>You’re all caught up</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={arrivals}
+                keyExtractor={(a) => `n-${a.id}`}
+                style={{ maxHeight: 380 }}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => {
+                      setNotifOpen(false);
+                      openArticle(item);
+                    }}
+                    style={[styles.notifRow, { borderBottomColor: palette.border }]}>
+                    <View style={[styles.notifDot, { backgroundColor: item.accent || palette.accent }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.notifRowTitle, { color: palette.text }]} numberOfLines={2}>
+                        {item.title}
+                      </Text>
+                      <Text style={[styles.notifRowMeta, { color: palette.textMuted }]}>{item.source}</Text>
+                    </View>
+                  </Pressable>
+                )}
+              />
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* ── Top text tabs (My Feed · Daily · Finance · Videos · Timelines · …) ── */}
       <View style={[styles.stripWrap, { borderBottomColor: palette.border }]}>
@@ -370,6 +455,39 @@ const styles = StyleSheet.create({
   },
   edgeBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   rightActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  badge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { color: '#fff', fontSize: 9.5, fontWeight: '900' },
+  notifBackdrop: { flex: 1, backgroundColor: '#0006' },
+  notifSheet: {
+    marginHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  notifHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+  notifTitle: { fontSize: 15, fontWeight: '800' },
+  notifClear: { fontSize: 13, fontWeight: '700' },
+  notifEmpty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 34 },
+  notifRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  notifDot: { width: 8, height: 8, borderRadius: 4 },
+  notifRowTitle: { fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  notifRowMeta: { fontSize: 11.5, marginTop: 3 },
   brandCenter: {
     position: 'absolute',
     left: 0,
