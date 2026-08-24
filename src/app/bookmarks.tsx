@@ -4,16 +4,12 @@ import * as WebBrowser from 'expo-web-browser';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ARTICLES, timeAgo } from '@/data/news';
+import { timeAgo } from '@/data/news';
 import { useApp } from '@/store/app';
 
 export default function Bookmarks() {
-  const { palette, bookmarks, toggleBookmark } = useApp();
+  const { palette, saved, toggleBookmark } = useApp();
   const insets = useSafeAreaInsets();
-
-  const saved = bookmarks
-    .map((id) => ARTICLES.find((a) => a.id === id))
-    .filter((a): a is NonNullable<typeof a> => Boolean(a));
 
   return (
     <View style={[styles.root, { backgroundColor: palette.bg, paddingTop: insets.top + 8 }]}>
@@ -45,7 +41,7 @@ export default function Bookmarks() {
                   {item.category} · {timeAgo(item.publishedAt)}
                 </Text>
               </View>
-              <Pressable hitSlop={10} onPress={() => toggleBookmark(item.id)}>
+              <Pressable hitSlop={10} onPress={() => toggleBookmark(item)}>
                 <Ionicons name="bookmark" size={22} color={palette.accent} />
               </Pressable>
             </Pressable>

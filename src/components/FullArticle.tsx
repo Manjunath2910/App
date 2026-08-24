@@ -61,7 +61,7 @@ export default function FullArticle() {
               <Text style={[styles.aa, { color: palette.text }]}>A</Text>
               <Text style={[styles.aaSmall, { color: palette.text }]}>a</Text>
             </Pressable>
-            <Pressable onPress={() => article && toggleBookmark(article.id)} hitSlop={10} style={styles.iconBtn}>
+            <Pressable onPress={() => article && toggleBookmark(article)} hitSlop={10} style={styles.iconBtn}>
               <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? palette.accent : palette.text} />
             </Pressable>
             <Pressable onPress={share} hitSlop={10} style={styles.iconBtn}>

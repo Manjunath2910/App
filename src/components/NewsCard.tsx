@@ -87,7 +87,7 @@ export default function NewsCard({ article, height }: Props) {
           read more at <Text style={{ color: article.accent, fontWeight: '700' }}>{article.source}</Text>
         </Text>
         <View style={styles.footerActions}>
-          <Pressable hitSlop={10} onPress={() => toggleBookmark(article.id)} style={styles.iconBtn}>
+          <Pressable hitSlop={10} onPress={() => toggleBookmark(article)} style={styles.iconBtn}>
             <Ionicons
               name={saved ? 'bookmark' : 'bookmark-outline'}
               size={20}

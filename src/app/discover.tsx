@@ -19,21 +19,29 @@ const QUICK: { label: string; icon: keyof typeof Ionicons.glyphMap; cat: Categor
 ];
 
 export default function Discover() {
-  const { palette, setCategory, openArticle } = useApp();
+  const { palette, setCategory, openArticle, catalog } = useApp();
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
+
+  // Search across everything the app has seen (blogs + live news + your posts),
+  // falling back to the bundled list.
+  const all = useMemo(() => {
+    const seen = new Set<string>();
+    return [...catalog, ...ARTICLES].filter((a) => (seen.has(a.id) ? false : seen.add(a.id)));
+  }, [catalog]);
 
   const results = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return [];
-    return ARTICLES.filter(
+    return all.filter(
       (a) =>
         a.title.toLowerCase().includes(t) ||
         a.summary.toLowerCase().includes(t) ||
+        (a.source || '').toLowerCase().includes(t) ||
         a.category.toLowerCase().includes(t) ||
         a.author.toLowerCase().includes(t),
     );
-  }, [q]);
+  }, [q, all]);
 
   const goCategory = (c: Category) => {
     setCategory(c);

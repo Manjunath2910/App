@@ -17,8 +17,11 @@ type AppState = {
   mode: ThemeMode;
   setMode: (m: ThemeMode) => void;
   bookmarks: string[];
+  saved: Article[];
   isBookmarked: (id: string) => boolean;
-  toggleBookmark: (id: string) => void;
+  toggleBookmark: (a: Article) => void;
+  catalog: Article[];
+  registerArticles: (list: Article[]) => void;
   category: Category;
   setCategory: (c: Category) => void;
   article: Article | null;
@@ -47,6 +50,7 @@ const AppCtx = createContext<AppState | null>(null);
 
 const MODE_KEY = 'mb:mode';
 const BOOKMARKS_KEY = 'mb:bookmarks';
+const SAVED_KEY = 'mb:saved'; // full saved article objects (so blogs/news show in Saved)
 const FONT_KEY = 'mb:fontscale';
 const INTERESTS_KEY = 'mb:interests';
 const LANG_KEY = 'mb:lang';
@@ -58,10 +62,18 @@ const POSTS_KEY = 'mb:posts';
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const yesterdayStr = () => new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
+// Merge new articles into an existing list, de-duped by id (existing wins order).
+function mergeById(base: Article[], add: Article[]): Article[] {
+  const seen = new Set(base.map((a) => a.id));
+  const extra = add.filter((a) => a && a.id && !seen.has(a.id));
+  return extra.length ? [...base, ...extra] : base;
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const system = useColorScheme();
   const [mode, setModeState] = useState<ThemeMode>('system');
-  const [bookmarks, setBookmarks] = useState<string[]>([]);
+  const [saved, setSaved] = useState<Article[]>([]);
+  const [catalog, setCatalog] = useState<Article[]>([]);
   const [category, setCategory] = useState<Category>('All');
   const [article, setArticle] = useState<Article | null>(null);
   const [fontScale, setFontScale] = useState(1);
@@ -78,7 +90,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         const [m, b, f, i, l, s, r, u, p] = await Promise.all([
           AsyncStorage.getItem(MODE_KEY),
-          AsyncStorage.getItem(BOOKMARKS_KEY),
+          AsyncStorage.getItem(SAVED_KEY),
           AsyncStorage.getItem(FONT_KEY),
           AsyncStorage.getItem(INTERESTS_KEY),
           AsyncStorage.getItem(LANG_KEY),
@@ -88,7 +100,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(POSTS_KEY),
         ]);
         if (m === 'light' || m === 'dark' || m === 'system') setModeState(m);
-        if (b) setBookmarks(JSON.parse(b));
+        if (b) {
+          const arr = JSON.parse(b);
+          if (Array.isArray(arr)) {
+            setSaved(arr);
+            setCatalog((prev) => mergeById(prev, arr));
+          }
+        }
         if (f && FONT_STEPS.includes(Number(f))) setFontScale(Number(f));
         if (i) setInterests(JSON.parse(i));
         if (l === 'en' || l === 'hi' || l === 'kn') setLangState(l);
@@ -116,13 +134,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const toggleBookmark = useCallback((id: string) => {
-    setBookmarks((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [id, ...prev];
-      AsyncStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next)).catch(() => {});
+  const toggleBookmark = useCallback((a: Article) => {
+    setSaved((prev) => {
+      const exists = prev.some((x) => x.id === a.id);
+      const next = exists ? prev.filter((x) => x.id !== a.id) : [a, ...prev];
+      AsyncStorage.setItem(SAVED_KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
   }, []);
+
+  // Collect every article the app has seen (bundled + live news + blogs + posts)
+  // so Search and Saved can find anything, not just the small bundled list.
+  const registerArticles = useCallback((list: Article[]) => {
+    if (!list?.length) return;
+    setCatalog((prev) => mergeById(prev, list));
+  }, []);
+
+  const bookmarks = useMemo(() => saved.map((a) => a.id), [saved]);
 
   const toggleInterest = useCallback((c: Interest) => {
     setInterests((prev) => {
@@ -202,8 +230,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       mode,
       setMode,
       bookmarks,
+      saved,
       isBookmarked: (id: string) => bookmarks.includes(id),
       toggleBookmark,
+      catalog,
+      registerArticles,
       category,
       setCategory,
       article,
@@ -226,7 +257,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       removePost,
     }),
     [
-      palette, isDark, mode, setMode, bookmarks, toggleBookmark, category, article, openArticle,
+      palette, isDark, mode, setMode, bookmarks, saved, toggleBookmark, catalog, registerArticles,
+      category, article, openArticle,
       fontScale, cycleFontScale, interests, toggleInterest, lang, setLang, stats, reminderOn, setReminderOn,
       user, signIn, signOut, myPosts, addPost, removePost,
     ],

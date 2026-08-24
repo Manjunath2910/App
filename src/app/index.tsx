@@ -30,7 +30,7 @@ type StripTab = { key: string; label: string; kind: 'feed' | 'all' | 'videos' | 
 const AList: any = Animated.FlatList;
 
 export default function Feed() {
-  const { palette, category, setCategory, isDark, setMode, interests, myPosts } = useApp();
+  const { palette, category, setCategory, isDark, setMode, interests, myPosts, registerArticles } = useApp();
   const t = useT();
   const insets = useSafeAreaInsets();
   const [h, setH] = useState(0);
@@ -76,24 +76,44 @@ export default function Feed() {
 
   // Load live news + ZoltMoney blogs on mount.
   useEffect(() => {
+    registerArticles([...MY_ARTICLES, ...ARTICLES]); // bundled/seed → searchable immediately
     fetchNews().then((a) => {
-      if (a.length) setLive([...MY_ARTICLES, ...a]);
+      if (a.length) {
+        setLive([...MY_ARTICLES, ...a]);
+        registerArticles(a);
+      }
     });
     // Blogs, fastest → fullest so they appear the instant the app opens:
     // 1) show last-saved blogs immediately (no network wait)
     // 2) a quick light fetch for fresh titles/images
     // 3) enrich with fuller ~110-word summaries in the background
     loadCachedBlogs().then((c) => {
-      if (c.length) setBlogs((prev) => (prev.length ? prev : c));
+      if (c.length) {
+        setBlogs((prev) => (prev.length ? prev : c));
+        registerArticles(c);
+      }
     });
     fetchBlogsFast()
       .then((b) => {
-        if (b.length) setBlogs(b);
+        if (b.length) {
+          setBlogs(b);
+          registerArticles(b);
+        }
       })
       .finally(() => {
-        fetchBlogs().then((b) => b.length && setBlogs(b));
+        fetchBlogs().then((b) => {
+          if (b.length) {
+            setBlogs(b);
+            registerArticles(b);
+          }
+        });
       });
   }, []);
+
+  // Keep your own posts searchable too.
+  useEffect(() => {
+    if (myPosts.length) registerArticles(myPosts);
+  }, [myPosts, registerArticles]);
 
   // When another screen changes the category (menu / discover), follow it.
   useEffect(() => {
