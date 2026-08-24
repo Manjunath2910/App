@@ -97,11 +97,19 @@ export default function Feed() {
       list.forEach((a) => a?.id && seenRef.current.add(a.id));
       return;
     }
+    const now = Date.now();
+    const RECENT_MS = 30 * 60 * 60 * 1000; // ~today (last 30h)
     const fresh = list.filter((a) => a && a.id && !seenRef.current.has(a.id));
-    if (fresh.length) {
-      const now = Date.now();
-      fresh.forEach((a) => seenRef.current.add(a.id));
-      const stamped = fresh.map((a) => ({ ...a, arrivedAt: now }));
+    // Mark everything fresh as seen so it won't re-trigger…
+    fresh.forEach((a) => seenRef.current.add(a.id));
+    // …but only *notify* for genuinely new content published recently (today),
+    // not older posts that merely got fetched now.
+    const recent = fresh.filter((a) => {
+      const t = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      return t > 0 && now - t < RECENT_MS;
+    });
+    if (recent.length) {
+      const stamped = recent.map((a) => ({ ...a, arrivedAt: now }));
       setArrivals((prev) => [...stamped, ...prev].slice(0, 40));
     }
   }, []);
