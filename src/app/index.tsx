@@ -15,6 +15,15 @@ import { useT } from '@/i18n';
 import { useApp } from '@/store/app';
 
 const shuffle = (arr: Article[]) => [...arr].sort(() => Math.random() - 0.5);
+// Rotate left by n (stable + deterministic): appended items stay at the end, so
+// the feed doesn't reorder while scrolling — but each refresh leads with a
+// different (still recent) story.
+const rotate = (arr: Article[], n: number) => {
+  const len = arr.length;
+  if (!len) return arr;
+  const k = ((n % len) + len) % len;
+  return [...arr.slice(k), ...arr.slice(0, k)];
+};
 // Newest-first by publish date (missing dates sort last).
 const byNewest = (arr: Article[]) =>
   [...arr].sort((a, b) => {
@@ -52,6 +61,7 @@ export default function Feed() {
   const [live, setLive] = useState<Article[] | null>(null); // live backend articles
   const [blogs, setBlogs] = useState<Article[]>([]); // ZoltMoney blog posts
   const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0); // bumps each refresh to reshuffle the lead
   // In-app "new stories" bell (each item stamped with when it arrived)
   const [arrivals, setArrivals] = useState<Array<Article & { arrivedAt: number }>>([]);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -197,16 +207,18 @@ export default function Feed() {
     const blogsLatest = byNewest(blogs); // ZoltMoney
     const newsLatest = byNewest(live ?? ARTICLES).filter((a) => a.category !== 'Blogs');
 
-    // My Feed / All: ZoltMoney-heavy mix (2 blogs : 1 news), both newest-first,
-    // so it's mostly ZoltMoney but still shows the latest other news of the day.
+    // My Feed / All: ZoltMoney-heavy mix (2 blogs : 1 news), newest-first.
+    // Each refresh rotates a different recent story to the lead (visible change).
     if (tab === 'My Feed' || tab === 'All') {
-      return [...myPosts, ...interleave(blogsLatest, newsLatest, 2, 1)];
+      const mix = interleave(blogsLatest, newsLatest, 2, 1);
+      const led = refreshTick > 0 ? rotate(mix, refreshTick * 4) : mix;
+      return [...myPosts, ...led];
     }
     if (tab === 'Videos') return byNewest([...blogsLatest, ...newsLatest]).filter((a) => a.videoUrl);
     if (tab === 'Marketing News') return newsLatest.filter((a) => a.category !== 'Markets');
     if (tab === 'Rate News' || tab === 'Finance') return newsLatest.filter((a) => a.category === 'Markets');
     return byNewest([...myPosts, ...blogsLatest, ...newsLatest]).filter((a) => a.category === tab);
-  }, [live, blogs, tab, interests, myPosts]);
+  }, [live, blogs, tab, interests, myPosts, refreshTick]);
 
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
@@ -231,6 +243,7 @@ export default function Feed() {
         registerArticles(a);
         noteArrivals(a);
       }
+      setRefreshTick((n) => n + 1); // reshuffle the lead so the feed visibly changes
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
     } finally {
       setRefreshing(false);
@@ -238,11 +251,15 @@ export default function Feed() {
     }
   }, [registerArticles, noteArrivals]);
 
-  // Double-tap the Home tab (bottom nav) to refresh.
+  // Double-tap the Home tab (bottom nav): snap all cards back to the top, then
+  // load fresh news.
   useEffect(() => {
     const unsub = (navigation as any)?.addListener?.('tabPress', () => {
       const now = Date.now();
-      if (now - lastHomeTapRef.current < 320) onRefresh();
+      if (now - lastHomeTapRef.current < 320) {
+        listRef.current?.scrollToOffset({ offset: 0, animated: true });
+        onRefresh();
+      }
       lastHomeTapRef.current = now;
     });
     return unsub;
