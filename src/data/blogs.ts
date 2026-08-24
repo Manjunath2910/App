@@ -74,7 +74,7 @@ function toArticle(p: any, full: string): Article {
   const excerpt = stripHtml(p?.excerpt?.rendered || '');
   // A fuller summary (~110 words) — more than the tiny excerpt, but still a
   // summary, not the whole article.
-  const summary = firstWords(full || excerpt, 110) || excerpt || stripHtml(p?.title?.rendered || '');
+  const summary = firstWords(full || excerpt, 130) || excerpt || stripHtml(p?.title?.rendered || '');
   return {
     id: `blog-${p.id}`,
     category: 'Blogs',

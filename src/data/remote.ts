@@ -78,7 +78,7 @@ function words60(text: string): string {
     .replace(/\s+/g, ' ')
     .trim();
   const w = clean.split(' ').filter(Boolean);
-  return w.length <= 60 ? clean : w.slice(0, 60).join(' ') + '…';
+  return w.length <= 110 ? clean : w.slice(0, 110).join(' ') + '…';
 }
 
 // Detect an embedded video (YouTube / Vimeo) inside the article HTML.

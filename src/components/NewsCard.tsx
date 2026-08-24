@@ -28,7 +28,7 @@ function inshortsMeta(iso: string) {
 export default function NewsCard({ article, height }: Props) {
   const { palette, isDark, isBookmarked, toggleBookmark, openArticle } = useApp();
   const saved = isBookmarked(article.id);
-  const imageHeight = Math.round(height * 0.42);
+  const imageHeight = Math.round(height * 0.37); // smaller image → more room for description
   const { time, date } = inshortsMeta(article.publishedAt);
 
   const openFull = () => openArticle(article);
@@ -130,12 +130,12 @@ const styles = StyleSheet.create({
   },
   brandIcon: { width: 18, height: 18, borderRadius: 5 },
   brandName: { color: '#1F1F26', fontSize: 12.5, fontWeight: '800', letterSpacing: -0.2 },
-  body: { flex: 1, paddingHorizontal: 22, paddingTop: 16, paddingBottom: 8 },
+  body: { flex: 1, paddingHorizontal: 22, paddingTop: 16, paddingBottom: 8, overflow: 'hidden' },
   title: { fontSize: 23, fontWeight: '700', lineHeight: 30, letterSpacing: -0.3 },
   meta: { fontSize: 12, marginTop: 8, lineHeight: 17 },
   metaShort: { fontWeight: '700', fontSize: 12 },
-  summary: { fontSize: 16, lineHeight: 25, marginTop: 12 },
-  swipeHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, marginTop: 14, opacity: 0.6 },
+  summary: { flex: 1, fontSize: 16, lineHeight: 24, marginTop: 12 },
+  swipeHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, marginTop: 10, opacity: 0.6 },
   swipeText: { fontSize: 11.5, fontWeight: '600', letterSpacing: 0.2 },
   footer: {
     height: 54,
