@@ -81,7 +81,8 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
       setConfirmation(conf);
       setStep('otp');
     } catch (e: any) {
-      setError('Could not send the code. Check the number and try again.');
+      const detail = e?.code || e?.message || 'unknown';
+      setError(`Could not send the code (${detail}).`);
     } finally {
       setBusy(false);
     }
