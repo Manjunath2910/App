@@ -52,7 +52,7 @@ const AList: any = Animated.FlatList;
 const NOTIF_SINCE_KEY = 'mb:notifSince'; // last time the user checked notifications
 
 export default function Feed() {
-  const { palette, category, setCategory, isDark, setMode, interests, myPosts, registerArticles, openArticle, speak, stopSpeak, liked, saved, history, muted } = useApp();
+  const { palette, category, setCategory, isDark, setMode, interests, myPosts, registerArticles, openArticle, liked, saved, history, muted } = useApp();
   const t = useT();
   const insets = useSafeAreaInsets();
   const [h, setH] = useState(0);
@@ -62,12 +62,6 @@ export default function Feed() {
   const [blogs, setBlogs] = useState<Article[]>([]); // ZoltMoney blog posts
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0); // bumps each refresh to reshuffle the lead
-  const [autoPlay, setAutoPlay] = useState(false); // hands-free: read each card, then advance
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const onViewRef = useRef(({ viewableItems }: any) => {
-    if (viewableItems?.length) setCurrentIndex(viewableItems[0].index ?? 0);
-  });
-  const viewConfigRef = useRef({ itemVisiblePercentThreshold: 60 });
   // In-app "new stories" bell (each item stamped with when it arrived)
   const [arrivals, setArrivals] = useState<Array<Article & { arrivedAt: number }>>([]);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -267,25 +261,6 @@ export default function Feed() {
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [tab]);
 
-  // Autoplay (listen hands-free): read the current card, then slide to the next.
-  useEffect(() => {
-    if (!autoPlay) return;
-    const item = data[currentIndex];
-    if (!item) return;
-    speak(item, () => {
-      const next = currentIndex + 1;
-      if (next < data.length) listRef.current?.scrollToIndex({ index: next, animated: true });
-      else setAutoPlay(false);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPlay, currentIndex]);
-
-  const toggleAutoPlay = useCallback(() => {
-    setAutoPlay((on) => {
-      if (on) stopSpeak();
-      return !on;
-    });
-  }, [stopSpeak]);
 
   const onRefresh = useCallback(async () => {
     if (refreshingRef.current) return;
@@ -379,9 +354,6 @@ export default function Feed() {
                 <Text style={styles.badgeText}>{arrivals.length > 9 ? '9+' : arrivals.length}</Text>
               </View>
             )}
-          </Pressable>
-          <Pressable onPress={toggleAutoPlay} hitSlop={8} style={styles.edgeBtn}>
-            <Ionicons name={autoPlay ? 'pause-circle' : 'headset-outline'} size={21} color={autoPlay ? palette.accent : palette.text} />
           </Pressable>
           <Pressable onPress={() => setMode(isDark ? 'light' : 'dark')} hitSlop={8} style={styles.edgeBtn}>
             <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={20} color={palette.text} />
@@ -527,8 +499,6 @@ export default function Feed() {
             windowSize={5}
             maxToRenderPerBatch={3}
             initialNumToRender={2}
-            onViewableItemsChanged={onViewRef.current}
-            viewabilityConfig={viewConfigRef.current}
             onScrollToIndexFailed={() => {}}
             onEndReached={onEndReached}
             onEndReachedThreshold={1.2}
