@@ -3,6 +3,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
+// expo-speech loaded lazily so the bundle/tsc never hard-depends on it.
+let SpeechMod: any = null;
+function speech(): any {
+  if (!SpeechMod) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      SpeechMod = require('expo-speech');
+    } catch {
+      SpeechMod = { speak: () => {}, stop: () => {} };
+    }
+  }
+  return SpeechMod;
+}
+
 import { PALETTE, type Palette, type ThemeMode } from '@/constants/appTheme';
 import type { Article, Category } from '@/data/news';
 
@@ -42,6 +56,10 @@ type AppState = {
   myPosts: Article[];
   addPost: (a: Article) => void;
   removePost: (id: string) => void;
+  // Text-to-speech (listen to a story)
+  speakingId: string | null;
+  speak: (a: Article, onDone?: () => void) => void;
+  stopSpeak: () => void;
 };
 
 const FONT_STEPS = [1, 1.12, 1.26];
@@ -83,6 +101,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reminderOn, setReminderOnState] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [myPosts, setMyPosts] = useState<Article[]>([]);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
 
   // Load persisted settings once.
   useEffect(() => {
@@ -198,6 +217,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ── Text-to-speech: read a story aloud ──
+  const stopSpeak = useCallback(() => {
+    try {
+      speech().stop();
+    } catch {
+      // ignore
+    }
+    setSpeakingId(null);
+  }, []);
+
+  const speak = useCallback((a: Article, onDone?: () => void) => {
+    try {
+      speech().stop();
+    } catch {
+      // ignore
+    }
+    const text = `${a.title}. ${a.summary}`.slice(0, 3800);
+    setSpeakingId(a.id);
+    speech().speak(text, {
+      rate: 1.0,
+      pitch: 1.0,
+      onDone: () => {
+        setSpeakingId(null);
+        onDone?.();
+      },
+      onStopped: () => setSpeakingId(null),
+      onError: () => setSpeakingId(null),
+    });
+  }, []);
+
   // Count a read and keep a daily streak going.
   const recordRead = useCallback(() => {
     setStats((prev) => {
@@ -255,12 +304,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       myPosts,
       addPost,
       removePost,
+      speakingId,
+      speak,
+      stopSpeak,
     }),
     [
       palette, isDark, mode, setMode, bookmarks, saved, toggleBookmark, catalog, registerArticles,
       category, article, openArticle,
       fontScale, cycleFontScale, interests, toggleInterest, lang, setLang, stats, reminderOn, setReminderOn,
-      user, signIn, signOut, myPosts, addPost, removePost,
+      user, signIn, signOut, myPosts, addPost, removePost, speakingId, speak, stopSpeak,
     ],
   );
 

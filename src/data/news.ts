@@ -259,3 +259,9 @@ export function timeAgo(iso: string): string {
   const days = Math.floor(hrs / 24);
   return `${days}d ago`;
 }
+
+// Estimated read time in minutes (~200 words/min), min 1.
+export function readMinutes(text: string): number {
+  const words = (text || '').split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
+}

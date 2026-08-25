@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { type Article } from '@/data/news';
+import { readMinutes, type Article } from '@/data/news';
 import { useApp } from '@/store/app';
 import { openUrl } from '@/utils/openUrl';
 import { shareStory } from '@/utils/share';
@@ -26,8 +26,10 @@ function inshortsMeta(iso: string) {
 }
 
 export default function NewsCard({ article, height }: Props) {
-  const { palette, isDark, isBookmarked, toggleBookmark, openArticle } = useApp();
+  const { palette, isDark, isBookmarked, toggleBookmark, openArticle, speak, stopSpeak, speakingId } = useApp();
   const saved = isBookmarked(article.id);
+  const listening = speakingId === article.id;
+  const mins = readMinutes(article.content || article.summary);
   const imageHeight = Math.round(height * 0.37); // smaller image → more room for description
   const { time, date } = inshortsMeta(article.publishedAt);
 
@@ -69,7 +71,7 @@ export default function NewsCard({ article, height }: Props) {
         {/* meta: short by {author} / {time} on {date} */}
         <Text style={[styles.meta, { color: metaText }]} numberOfLines={2}>
           <Text style={[styles.metaShort, { color: isDark ? palette.text : '#2B2B33' }]}>short </Text>
-          by {article.author} / {time} on {date}
+          by {article.author} / {time} on {date} · {mins} min read
         </Text>
 
         <Text style={[styles.summary, { color: bodyText }]}>{article.summary}</Text>
@@ -87,6 +89,13 @@ export default function NewsCard({ article, height }: Props) {
           read more at <Text style={{ color: article.accent, fontWeight: '700' }}>{article.source}</Text>
         </Text>
         <View style={styles.footerActions}>
+          <Pressable hitSlop={10} onPress={() => (listening ? stopSpeak() : speak(article))} style={styles.iconBtn}>
+            <Ionicons
+              name={listening ? 'stop-circle' : 'volume-high-outline'}
+              size={21}
+              color={listening ? article.accent : metaText}
+            />
+          </Pressable>
           <Pressable hitSlop={10} onPress={() => toggleBookmark(article)} style={styles.iconBtn}>
             <Ionicons
               name={saved ? 'bookmark' : 'bookmark-outline'}

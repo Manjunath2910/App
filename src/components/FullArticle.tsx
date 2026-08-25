@@ -24,11 +24,12 @@ function metaLine(iso: string) {
 }
 
 export default function FullArticle() {
-  const { palette, isDark, article, openArticle, closeArticle, isBookmarked, toggleBookmark, fontScale, cycleFontScale } =
+  const { palette, isDark, article, openArticle, closeArticle, isBookmarked, toggleBookmark, fontScale, cycleFontScale, speak, stopSpeak, speakingId } =
     useApp();
   const insets = useSafeAreaInsets();
   const visible = Boolean(article);
   const saved = article ? isBookmarked(article.id) : false;
+  const listening = article ? speakingId === article.id : false;
 
   const openSource = () => {
     if (!article) return;
@@ -53,10 +54,13 @@ export default function FullArticle() {
       <View style={{ flex: 1, backgroundColor: palette.card }}>
         {/* Top bar */}
         <View style={[styles.topBar, { paddingTop: insets.top + 6, backgroundColor: palette.card, borderBottomColor: palette.border }]}>
-          <Pressable onPress={closeArticle} hitSlop={10} style={styles.iconBtn}>
+          <Pressable onPress={() => { stopSpeak(); closeArticle(); }} hitSlop={10} style={styles.iconBtn}>
             <Ionicons name="chevron-down" size={24} color={palette.text} />
           </Pressable>
           <View style={styles.topActions}>
+            <Pressable onPress={() => (article ? (listening ? stopSpeak() : speak(article)) : null)} hitSlop={10} style={styles.iconBtn}>
+              <Ionicons name={listening ? 'stop-circle' : 'volume-high-outline'} size={21} color={listening ? palette.accent : palette.text} />
+            </Pressable>
             <Pressable onPress={cycleFontScale} hitSlop={10} style={styles.iconBtn}>
               <Text style={[styles.aa, { color: palette.text }]}>A</Text>
               <Text style={[styles.aaSmall, { color: palette.text }]}>a</Text>
