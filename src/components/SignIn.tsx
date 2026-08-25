@@ -15,6 +15,7 @@ type Props = { visible: boolean; onClose: () => void; onSuccess?: () => void };
 type Step = 'options' | 'phone' | 'otp';
 
 const ICON = require('../../assets/images/icon.png');
+const GOOGLE_LOGO = require('../../assets/images/google.png');
 
 export default function SignIn({ visible, onClose, onSuccess }: Props) {
   const { palette, signIn } = useApp();
@@ -145,7 +146,7 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
           {step === 'options' && (
             <>
               <Pressable onPress={onGoogle} disabled={busy} style={[styles.btn, { backgroundColor: palette.card, borderColor: palette.border, borderWidth: StyleSheet.hairlineWidth, opacity: busy ? 0.6 : 1 }]}>
-                <Ionicons name="logo-google" size={20} color="#EA4335" />
+                <Image source={GOOGLE_LOGO} style={styles.googleLogo} contentFit="contain" />
                 <Text style={[styles.btnText, { color: palette.text }]}>Sign in with google</Text>
               </Pressable>
 
@@ -183,6 +184,13 @@ export default function SignIn({ visible, onClose, onSuccess }: Props) {
                   keyboardType="number-pad"
                   style={[styles.phoneInput, { color: palette.text }]}
                   autoFocus
+                  autoComplete="off"
+                  importantForAutofill="no"
+                  textContentType="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  underlineColorAndroid="transparent"
+                  selectionColor={palette.accent}
                 />
               </View>
               <Pressable onPress={onSendCode} disabled={!phoneValid || busy} style={[styles.cta, { backgroundColor: phoneValid && !busy ? palette.accent : palette.surfaceAlt }]}>
@@ -231,6 +239,7 @@ const styles = StyleSheet.create({
   body: { marginTop: 60, gap: 16 },
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 56, borderRadius: 12 },
   btnText: { fontSize: 16, fontWeight: '700' },
+  googleLogo: { width: 20, height: 20 },
   title: { fontSize: 21, fontWeight: '900', letterSpacing: -0.4, marginBottom: 6 },
   desc: { fontSize: 14, lineHeight: 20, marginBottom: 16 },
   phoneRow: { flexDirection: 'row', alignItems: 'center', height: 54, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
