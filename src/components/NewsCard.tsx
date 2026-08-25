@@ -26,8 +26,9 @@ function inshortsMeta(iso: string) {
 }
 
 export default function NewsCard({ article, height }: Props) {
-  const { palette, isDark, isBookmarked, toggleBookmark, openArticle, speak, stopSpeak, speakingId } = useApp();
+  const { palette, isDark, isBookmarked, toggleBookmark, openArticle, speak, stopSpeak, speakingId, isLiked, toggleLike } = useApp();
   const saved = isBookmarked(article.id);
+  const liked = isLiked(article.id);
   const listening = speakingId === article.id;
   const mins = readMinutes(article.content || article.summary);
   const imageHeight = Math.round(height * 0.37); // smaller image → more room for description
@@ -89,6 +90,9 @@ export default function NewsCard({ article, height }: Props) {
           read more at <Text style={{ color: article.accent, fontWeight: '700' }}>{article.source}</Text>
         </Text>
         <View style={styles.footerActions}>
+          <Pressable hitSlop={10} onPress={() => toggleLike(article)} style={styles.iconBtn}>
+            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#F43F5E' : metaText} />
+          </Pressable>
           <Pressable hitSlop={10} onPress={() => (listening ? stopSpeak() : speak(article))} style={styles.iconBtn}>
             <Ionicons
               name={listening ? 'stop-circle' : 'volume-high-outline'}

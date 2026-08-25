@@ -21,7 +21,8 @@ import { PALETTE, type Palette, type ThemeMode } from '@/constants/appTheme';
 import type { Article, Category } from '@/data/news';
 
 export type Lang = 'en' | 'hi' | 'kn';
-export type Stats = { read: number; streak: number; lastRead: string };
+export type Stats = { read: number; streak: number; lastRead: string; today: number };
+export const DAILY_GOAL = 5;
 export type User = { name: string; email: string };
 type Interest = Exclude<Category, 'All'>;
 
@@ -60,6 +61,17 @@ type AppState = {
   speakingId: string | null;
   speak: (a: Article, onDone?: () => void) => void;
   stopSpeak: () => void;
+  // Reading history + continue reading
+  history: Article[];
+  clearHistory: () => void;
+  // Likes
+  liked: Article[];
+  isLiked: (id: string) => boolean;
+  toggleLike: (a: Article) => void;
+  // Muted topics/sources (hidden from the feed)
+  muted: string[];
+  isMuted: (name: string) => boolean;
+  toggleMute: (name: string) => void;
 };
 
 const FONT_STEPS = [1, 1.12, 1.26];
@@ -76,6 +88,9 @@ const STATS_KEY = 'mb:stats';
 const REMINDER_KEY = 'mb:reminder';
 const USER_KEY = 'mb:user';
 const POSTS_KEY = 'mb:posts';
+const HISTORY_KEY = 'mb:history';
+const LIKED_KEY = 'mb:liked';
+const MUTED_KEY = 'mb:muted';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const yesterdayStr = () => new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -97,17 +112,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [fontScale, setFontScale] = useState(1);
   const [interests, setInterests] = useState<Interest[]>([]);
   const [lang, setLangState] = useState<Lang>('en');
-  const [stats, setStats] = useState<Stats>({ read: 0, streak: 0, lastRead: '' });
+  const [stats, setStats] = useState<Stats>({ read: 0, streak: 0, lastRead: '', today: 0 });
+  const [liked, setLiked] = useState<Article[]>([]);
+  const [muted, setMuted] = useState<string[]>([]);
   const [reminderOn, setReminderOnState] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [myPosts, setMyPosts] = useState<Article[]>([]);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [history, setHistory] = useState<Article[]>([]);
 
   // Load persisted settings once.
   useEffect(() => {
     (async () => {
       try {
-        const [m, b, f, i, l, s, r, u, p] = await Promise.all([
+        const [m, b, f, i, l, s, r, u, p, hist, lk, mt] = await Promise.all([
           AsyncStorage.getItem(MODE_KEY),
           AsyncStorage.getItem(SAVED_KEY),
           AsyncStorage.getItem(FONT_KEY),
@@ -117,8 +135,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(REMINDER_KEY),
           AsyncStorage.getItem(USER_KEY),
           AsyncStorage.getItem(POSTS_KEY),
+          AsyncStorage.getItem(HISTORY_KEY),
+          AsyncStorage.getItem(LIKED_KEY),
+          AsyncStorage.getItem(MUTED_KEY),
         ]);
-        if (m === 'light' || m === 'dark' || m === 'system') setModeState(m);
+        if (m === 'light' || m === 'dark' || m === 'sepia' || m === 'black' || m === 'system') setModeState(m);
         if (b) {
           const arr = JSON.parse(b);
           if (Array.isArray(arr)) {
@@ -129,10 +150,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (f && FONT_STEPS.includes(Number(f))) setFontScale(Number(f));
         if (i) setInterests(JSON.parse(i));
         if (l === 'en' || l === 'hi' || l === 'kn') setLangState(l);
-        if (s) setStats(JSON.parse(s));
+        if (s) {
+          const st = JSON.parse(s);
+          setStats({ read: st.read || 0, streak: st.streak || 0, lastRead: st.lastRead || '', today: st.lastRead === todayStr() ? st.today || 0 : 0 });
+        }
         if (r === '1') setReminderOnState(true);
         if (u) setUser(JSON.parse(u));
         if (p) setMyPosts(JSON.parse(p));
+        if (hist) {
+          const arr = JSON.parse(hist);
+          if (Array.isArray(arr)) {
+            setHistory(arr);
+            setCatalog((prev) => mergeById(prev, arr));
+          }
+        }
+        if (lk) {
+          const arr = JSON.parse(lk);
+          if (Array.isArray(arr)) {
+            setLiked(arr);
+            setCatalog((prev) => mergeById(prev, arr));
+          }
+        }
+        if (mt) {
+          const arr = JSON.parse(mt);
+          if (Array.isArray(arr)) setMuted(arr);
+        }
       } catch {
         // ignore — first run
       }
@@ -251,12 +293,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const recordRead = useCallback(() => {
     setStats((prev) => {
       const today = todayStr();
+      const isNewDay = prev.lastRead !== today;
       let streak = prev.streak;
-      if (prev.lastRead !== today) {
+      if (isNewDay) {
         streak = prev.lastRead === yesterdayStr() ? prev.streak + 1 : 1;
       }
-      const next = { read: prev.read + 1, streak: Math.max(1, streak), lastRead: today };
+      const next: Stats = {
+        read: prev.read + 1,
+        streak: Math.max(1, streak),
+        lastRead: today,
+        today: isNewDay ? 1 : (prev.today || 0) + 1,
+      };
       AsyncStorage.setItem(STATS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const toggleLike = useCallback((a: Article) => {
+    setLiked((prev) => {
+      const exists = prev.some((x) => x.id === a.id);
+      const next = exists ? prev.filter((x) => x.id !== a.id) : [a, ...prev];
+      AsyncStorage.setItem(LIKED_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const toggleMute = useCallback((name: string) => {
+    setMuted((prev) => {
+      const next = prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name];
+      AsyncStorage.setItem(MUTED_KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
   }, []);
@@ -265,12 +330,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (a: Article) => {
       setArticle(a);
       recordRead();
+      setHistory((prev) => {
+        const next = [a, ...prev.filter((x) => x.id !== a.id)].slice(0, 60);
+        AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next)).catch(() => {});
+        return next;
+      });
     },
     [recordRead],
   );
 
-  const isDark = mode === 'system' ? system === 'dark' : mode === 'dark';
-  const palette = isDark ? PALETTE.dark : PALETTE.light;
+  const clearHistory = useCallback(() => {
+    setHistory([]);
+    AsyncStorage.removeItem(HISTORY_KEY).catch(() => {});
+  }, []);
+
+  const resolved = mode === 'system' ? (system === 'dark' ? 'dark' : 'light') : mode;
+  const isDark = resolved === 'dark' || resolved === 'black';
+  const palette = (PALETTE as Record<string, Palette>)[resolved] ?? PALETTE.light;
 
   const value = useMemo<AppState>(
     () => ({
@@ -307,12 +383,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       speakingId,
       speak,
       stopSpeak,
+      history,
+      clearHistory,
+      liked,
+      isLiked: (id: string) => liked.some((a) => a.id === id),
+      toggleLike,
+      muted,
+      isMuted: (name: string) => muted.includes(name),
+      toggleMute,
     }),
     [
       palette, isDark, mode, setMode, bookmarks, saved, toggleBookmark, catalog, registerArticles,
       category, article, openArticle,
       fontScale, cycleFontScale, interests, toggleInterest, lang, setLang, stats, reminderOn, setReminderOn,
-      user, signIn, signOut, myPosts, addPost, removePost, speakingId, speak, stopSpeak,
+      user, signIn, signOut, myPosts, addPost, removePost, speakingId, speak, stopSpeak, history, clearHistory,
+      liked, toggleLike, muted, toggleMute,
     ],
   );
 

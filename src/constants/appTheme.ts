@@ -38,7 +38,47 @@ export const PALETTE = {
     overlay: 'rgba(0,0,0,0.55)',
     imgPlaceholder: '#1A1A22',
   },
+  // Warm paper tones — easy on the eyes for long reading.
+  sepia: {
+    bg: '#EDE4D3',
+    card: '#F6EEDD',
+    surface: '#F6EEDD',
+    surfaceAlt: '#E7DCC6',
+    text: '#3B2F22',
+    textMuted: '#7A6A55',
+    textFaint: '#A2917A',
+    border: '#DDD0B8',
+    accent: '#B4562A',
+    accentSoft: '#EFDFC9',
+    accentText: '#FFFFFF',
+    chipBg: '#E9DEC9',
+    chipText: '#5A4B39',
+    tabBar: '#F6EEDD',
+    tabInactive: '#A2917A',
+    overlay: 'rgba(40,30,18,0.5)',
+    imgPlaceholder: '#DED0B6',
+  },
+  // True black — battery-friendly on OLED screens.
+  black: {
+    bg: '#000000',
+    card: '#000000',
+    surface: '#0A0A0C',
+    surfaceAlt: '#141418',
+    text: '#F4F4F7',
+    textMuted: '#8E8E99',
+    textFaint: '#5A5A64',
+    border: '#1B1B20',
+    accent: '#FB6F84',
+    accentSoft: '#241318',
+    accentText: '#000000',
+    chipBg: '#141418',
+    chipText: '#C9C9D4',
+    tabBar: '#000000',
+    tabInactive: '#54545E',
+    overlay: 'rgba(0,0,0,0.6)',
+    imgPlaceholder: '#111114',
+  },
 } as const;
 
 export type Palette = { [K in keyof typeof PALETTE.light]: string };
-export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeMode = 'light' | 'dark' | 'sepia' | 'black' | 'system';

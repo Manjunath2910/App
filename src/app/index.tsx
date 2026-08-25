@@ -52,7 +52,7 @@ const AList: any = Animated.FlatList;
 const NOTIF_SINCE_KEY = 'mb:notifSince'; // last time the user checked notifications
 
 export default function Feed() {
-  const { palette, category, setCategory, isDark, setMode, interests, myPosts, registerArticles, openArticle, speak, stopSpeak } = useApp();
+  const { palette, category, setCategory, isDark, setMode, interests, myPosts, registerArticles, openArticle, speak, stopSpeak, liked, saved, history, muted } = useApp();
   const t = useT();
   const insets = useSafeAreaInsets();
   const [h, setH] = useState(0);
@@ -75,7 +75,7 @@ export default function Feed() {
   // Only notify for content published AFTER this time — set to "last time you
   // checked". Default: last 24h, so today's ZoltMoney + news show on open.
   const notifSinceRef = useRef<number>(Date.now() - 24 * 60 * 60 * 1000);
-  const [tab, setTab] = useState<string>('My Feed');
+  const [tab, setTab] = useState<string>('For You');
   const didMount = useRef(false);
   const listRef = useRef<FlatList<Article>>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -197,6 +197,7 @@ export default function Feed() {
   // Top strip: section tabs.
   const strip: StripTab[] = useMemo(
     () => [
+      { key: 'For You', label: 'For You', kind: 'feed' },
       { key: 'My Feed', label: t('myFeed'), kind: 'feed' },
       { key: 'Marketing News', label: 'Marketing News', kind: 'marketing' },
       { key: 'Rate News', label: 'Rate News', kind: 'rates' },
@@ -208,23 +209,59 @@ export default function Feed() {
     [t],
   );
 
+  // Affinity: how much you like each category, learned from follows + likes +
+  // saves + reads. Drives the "For You" ranking.
+  const affinity = useMemo(() => {
+    const w: Record<string, number> = {};
+    const bump = (cat?: string, n = 1) => {
+      if (cat) w[cat] = (w[cat] || 0) + n;
+    };
+    interests.forEach((c) => bump(c as string, 3));
+    liked.forEach((a) => bump(a.category, 2.5));
+    saved.forEach((a) => bump(a.category, 1.5));
+    history.forEach((a) => bump(a.category, 1));
+    return w;
+  }, [interests, liked, saved, history]);
+
+  const notMuted = useCallback(
+    (a: Article) => !muted.includes(a.category) && !muted.includes(a.source),
+    [muted],
+  );
+
   const data = useMemo(() => {
     // Newest first, always — so the feed leads with the latest / today's stories.
-    const blogsLatest = byNewest(blogs); // ZoltMoney
-    const newsLatest = byNewest(live ?? ARTICLES).filter((a) => a.category !== 'Blogs');
+    const blogsLatest = byNewest(blogs).filter(notMuted); // ZoltMoney
+    const newsLatest = byNewest(live ?? ARTICLES).filter((a) => a.category !== 'Blogs').filter(notMuted);
+
+    // For You: rank by your affinity + recency, keeping ZoltMoney prominent.
+    if (tab === 'For You') {
+      const pool = [...blogsLatest, ...newsLatest];
+      const now = Date.now();
+      const scored = pool
+        .map((a) => {
+          const t = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+          const recency = t ? Math.max(0, 1 - (now - t) / (72 * 3600 * 1000)) : 0; // 0..1 over 3 days
+          const base = a.category === 'Blogs' ? 1.5 : 0; // keep ZoltMoney prominent
+          const score = (affinity[a.category] || 0) + base + recency * 1.5;
+          return { a, score };
+        })
+        .sort((x, y) => y.score - x.score)
+        .map((x) => x.a);
+      const led = refreshTick > 0 ? rotate(scored, refreshTick * 4) : scored;
+      return [...myPosts.filter(notMuted), ...led];
+    }
 
     // My Feed / All: ZoltMoney-heavy mix (2 blogs : 1 news), newest-first.
-    // Each refresh rotates a different recent story to the lead (visible change).
     if (tab === 'My Feed' || tab === 'All') {
       const mix = interleave(blogsLatest, newsLatest, 2, 1);
       const led = refreshTick > 0 ? rotate(mix, refreshTick * 4) : mix;
-      return [...myPosts, ...led];
+      return [...myPosts.filter(notMuted), ...led];
     }
     if (tab === 'Videos') return byNewest([...blogsLatest, ...newsLatest]).filter((a) => a.videoUrl);
     if (tab === 'Marketing News') return newsLatest.filter((a) => a.category !== 'Markets');
     if (tab === 'Rate News' || tab === 'Finance') return newsLatest.filter((a) => a.category === 'Markets');
     return byNewest([...myPosts, ...blogsLatest, ...newsLatest]).filter((a) => a.category === tab);
-  }, [live, blogs, tab, interests, myPosts, refreshTick]);
+  }, [live, blogs, tab, interests, myPosts, refreshTick, affinity, notMuted]);
 
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: false });

@@ -24,11 +24,12 @@ function metaLine(iso: string) {
 }
 
 export default function FullArticle() {
-  const { palette, isDark, article, openArticle, closeArticle, isBookmarked, toggleBookmark, fontScale, cycleFontScale, speak, stopSpeak, speakingId } =
+  const { palette, isDark, article, openArticle, closeArticle, isBookmarked, toggleBookmark, fontScale, cycleFontScale, speak, stopSpeak, speakingId, isLiked, toggleLike } =
     useApp();
   const insets = useSafeAreaInsets();
   const visible = Boolean(article);
   const saved = article ? isBookmarked(article.id) : false;
+  const liked = article ? isLiked(article.id) : false;
   const listening = article ? speakingId === article.id : false;
 
   const openSource = () => {
@@ -64,6 +65,9 @@ export default function FullArticle() {
             <Pressable onPress={cycleFontScale} hitSlop={10} style={styles.iconBtn}>
               <Text style={[styles.aa, { color: palette.text }]}>A</Text>
               <Text style={[styles.aaSmall, { color: palette.text }]}>a</Text>
+            </Pressable>
+            <Pressable onPress={() => article && toggleLike(article)} hitSlop={10} style={styles.iconBtn}>
+              <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#F43F5E' : palette.text} />
             </Pressable>
             <Pressable onPress={() => article && toggleBookmark(article)} hitSlop={10} style={styles.iconBtn}>
               <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? palette.accent : palette.text} />

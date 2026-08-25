@@ -8,13 +8,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SignIn from '@/components/SignIn';
 import { CATEGORIES } from '@/data/news';
 import { useT } from '@/i18n';
-import { useApp, type Lang } from '@/store/app';
+import { useApp, DAILY_GOAL, type Lang } from '@/store/app';
 import type { ThemeMode } from '@/constants/appTheme';
 
 const TOPICS = CATEGORIES.filter((c) => c !== 'All') as string[];
 
 export default function Profile() {
-  const { palette, stats, bookmarks, interests, toggleInterest, lang, setLang, mode, setMode, user, signOut } = useApp();
+  const { palette, stats, bookmarks, interests, toggleInterest, lang, setLang, mode, setMode, user, signOut, history, openArticle, clearHistory, liked, isMuted, toggleMute } = useApp();
+  const goalPct = Math.min(1, (stats.today || 0) / DAILY_GOAL);
   const t = useT();
   const insets = useSafeAreaInsets();
   const [showSignIn, setShowSignIn] = useState(false);
@@ -23,6 +24,8 @@ export default function Profile() {
     { key: 'system', label: t('system'), icon: 'phone-portrait-outline' },
     { key: 'light', label: t('lightMode'), icon: 'sunny-outline' },
     { key: 'dark', label: t('darkMode'), icon: 'moon-outline' },
+    { key: 'sepia', label: 'Sepia', icon: 'book-outline' },
+    { key: 'black', label: 'OLED', icon: 'contrast-outline' },
   ];
   const langs: { key: Lang; label: string }[] = [
     { key: 'en', label: 'English' },
@@ -62,6 +65,24 @@ export default function Profile() {
           </Pressable>
         </View>
 
+        {/* Daily goal */}
+        <View style={{ paddingHorizontal: 18, marginTop: 12 }}>
+          <View style={[styles.goalCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+            <View style={styles.goalTop}>
+              <Text style={[styles.goalTitle, { color: palette.text }]}>Today’s reading goal</Text>
+              <Text style={[styles.goalCount, { color: palette.accent }]}>
+                {Math.min(stats.today || 0, DAILY_GOAL)}/{DAILY_GOAL}
+              </Text>
+            </View>
+            <View style={[styles.goalTrack, { backgroundColor: palette.surfaceAlt }]}>
+              <View style={[styles.goalFill, { width: `${goalPct * 100}%`, backgroundColor: palette.accent }]} />
+            </View>
+            <Text style={[styles.goalHint, { color: palette.textMuted }]}>
+              {goalPct >= 1 ? '🎉 Goal reached — nice one!' : `Read ${DAILY_GOAL - (stats.today || 0)} more to hit today’s goal`}
+            </Text>
+          </View>
+        </View>
+
         {/* Interests */}
         <Section title={t('yourInterests')} desc={t('interestsDesc')} palette={palette} />
         <View style={styles.chips}>
@@ -79,6 +100,28 @@ export default function Profile() {
                 ]}>
                 {on && <Ionicons name="checkmark" size={14} color={palette.accentText} />}
                 <Text style={[styles.chipText, { color: on ? palette.accentText : palette.text }]}>{c}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Muted topics */}
+        <Section title="Muted topics" desc="Hidden from For You and your feed" palette={palette} />
+        <View style={styles.chips}>
+          {TOPICS.map((c) => {
+            const off = isMuted(c);
+            return (
+              <Pressable
+                key={`mute-${c}`}
+                onPress={() => toggleMute(c)}
+                style={[
+                  styles.chip,
+                  off
+                    ? { backgroundColor: palette.textMuted }
+                    : { backgroundColor: palette.card, borderColor: palette.border, borderWidth: StyleSheet.hairlineWidth },
+                ]}>
+                <Ionicons name={off ? 'eye-off' : 'eye-off-outline'} size={13} color={off ? '#fff' : palette.textMuted} />
+                <Text style={[styles.chipText, { color: off ? '#fff' : palette.text }]}>{c}</Text>
               </Pressable>
             );
           })}
@@ -102,20 +145,77 @@ export default function Profile() {
 
         {/* Appearance */}
         <Section title={t('appearance')} palette={palette} />
-        <View style={styles.segRow}>
+        <View style={[styles.segRow, { flexWrap: 'wrap' }]}>
           {modes.map((m) => {
             const on = mode === m.key;
             return (
               <Pressable
                 key={m.key}
                 onPress={() => setMode(m.key)}
-                style={[styles.seg, { backgroundColor: on ? palette.accent : palette.card, borderColor: palette.border }]}>
+                style={[styles.themeSeg, { backgroundColor: on ? palette.accent : palette.card, borderColor: palette.border }]}>
                 <Ionicons name={m.icon} size={16} color={on ? palette.accentText : palette.text} />
                 <Text style={[styles.segText, { color: on ? palette.accentText : palette.text }]}>{m.label}</Text>
               </Pressable>
             );
           })}
         </View>
+
+        {/* Continue reading + history */}
+        {history.length > 0 && (
+          <>
+            <Section title="Continue reading" palette={palette} />
+            <View style={{ paddingHorizontal: 18 }}>
+              <Pressable
+                onPress={() => openArticle(history[0])}
+                style={[styles.continueBtn, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                <Ionicons name="play-circle" size={26} color={palette.accent} />
+                <Text style={[styles.continueText, { color: palette.text }]} numberOfLines={2}>
+                  {history[0].title}
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.histHead}>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>Reading history</Text>
+              <Pressable onPress={clearHistory} hitSlop={8}>
+                <Text style={{ color: palette.accent, fontSize: 13, fontWeight: '700' }}>Clear</Text>
+              </Pressable>
+            </View>
+            <View style={{ paddingHorizontal: 18, gap: 8 }}>
+              {history.slice(0, 8).map((a) => (
+                <Pressable
+                  key={`h-${a.id}`}
+                  onPress={() => openArticle(a)}
+                  style={[styles.histRow, { borderBottomColor: palette.border }]}>
+                  <Ionicons name="time-outline" size={16} color={palette.textMuted} />
+                  <Text style={[styles.histText, { color: palette.textMuted }]} numberOfLines={1}>
+                    {a.title}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Liked stories */}
+        {liked.length > 0 && (
+          <>
+            <Section title={`Liked stories (${liked.length})`} palette={palette} />
+            <View style={{ paddingHorizontal: 18, gap: 8 }}>
+              {liked.slice(0, 8).map((a) => (
+                <Pressable
+                  key={`l-${a.id}`}
+                  onPress={() => openArticle(a)}
+                  style={[styles.histRow, { borderBottomColor: palette.border }]}>
+                  <Ionicons name="heart" size={15} color="#F43F5E" />
+                  <Text style={[styles.histText, { color: palette.textMuted }]} numberOfLines={1}>
+                    {a.title}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* Account */}
         <Section title={t('account')} palette={palette} />
@@ -192,6 +292,36 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   segText: { fontSize: 14, fontWeight: '700' },
+  themeSeg: {
+    flexGrow: 1,
+    flexBasis: '30%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  goalCard: { padding: 14, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
+  goalTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  goalTitle: { fontSize: 14.5, fontWeight: '800' },
+  goalCount: { fontSize: 14.5, fontWeight: '900' },
+  goalTrack: { height: 9, borderRadius: 999, overflow: 'hidden' },
+  goalFill: { height: 9, borderRadius: 999 },
+  goalHint: { fontSize: 12.5, marginTop: 8, fontWeight: '600' },
+  continueBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  continueText: { flex: 1, fontSize: 14.5, fontWeight: '700', lineHeight: 20 },
+  histHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 10 },
+  histRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
+  histText: { flex: 1, fontSize: 13.5 },
   authBtn: {
     flexDirection: 'row',
     alignItems: 'center',
