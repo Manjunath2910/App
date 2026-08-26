@@ -50,6 +50,7 @@ async function sendPush(tokens, title, link) {
     data: { url: link },
   }));
   const dead = [];
+  const results = [];
   for (const batch of chunk(messages, EXPO_BATCH_SIZE)) {
     try {
       const res = await fetch(EXPO_PUSH_URL, {
@@ -60,6 +61,7 @@ async function sendPush(tokens, title, link) {
       const json = await res.json().catch(() => null);
       const tickets = json && Array.isArray(json.data) ? json.data : [];
       tickets.forEach((ticket, i) => {
+        results.push({ status: ticket?.status, error: ticket?.details?.error || ticket?.message });
         if (ticket?.status === 'error' && ticket?.details?.error === 'DeviceNotRegistered') {
           const t = batch[i]?.to;
           if (t) dead.push(t);
@@ -69,7 +71,7 @@ async function sendPush(tokens, title, link) {
       // ignore batch failure
     }
   }
-  return dead;
+  return { dead, results };
 }
 
 export default async function handler(req, res) {
@@ -113,10 +115,10 @@ export default async function handler(req, res) {
     // Send when there's a new post — or when ?force=1 is passed (manual test).
     if (force || newestId > lastPostId) {
       const title = cleanTitle(newest.title?.rendered ?? newest.title);
-      const dead = tokens.length ? await sendPush(tokens, title, newest.link) : [];
-      for (const t of dead) await redis(['SREM', 'tokens', t]);
+      const out = tokens.length ? await sendPush(tokens, title, newest.link) : { dead: [], results: [] };
+      for (const t of out.dead) await redis(['SREM', 'tokens', t]);
       await redis(['SET', 'lastPostId', String(newestId)]);
-      return res.json({ ok: true, sent: tokens.length - dead.length, devices: tokens.length, post: newestId, forced: force });
+      return res.json({ ok: true, sent: tokens.length - out.dead.length, devices: tokens.length, post: newestId, forced: force, tickets: out.results });
     }
 
     return res.json({ ok: true, upToDate: lastPostId, devices: tokens.length });
