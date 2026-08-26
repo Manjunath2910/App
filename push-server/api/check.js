@@ -97,26 +97,29 @@ export default async function handler(req, res) {
 
     const newest = posts[0];
     const newestId = Number(newest.id);
+    const force = req.query?.force === '1' || req.query?.test === '1';
+
+    const membersRes = await redis(['SMEMBERS', 'tokens']);
+    const tokens = Array.isArray(membersRes?.result) ? membersRes.result : [];
 
     const lastRes = await redis(['GET', 'lastPostId']);
     const lastPostId = lastRes?.result != null ? Number(lastRes.result) : null;
 
-    if (lastPostId === null || Number.isNaN(lastPostId)) {
+    if (!force && (lastPostId === null || Number.isNaN(lastPostId))) {
       await redis(['SET', 'lastPostId', String(newestId)]);
-      return res.json({ ok: true, baseline: newestId });
+      return res.json({ ok: true, baseline: newestId, devices: tokens.length });
     }
 
-    if (newestId > lastPostId) {
+    // Send when there's a new post — or when ?force=1 is passed (manual test).
+    if (force || newestId > lastPostId) {
       const title = cleanTitle(newest.title?.rendered ?? newest.title);
-      const membersRes = await redis(['SMEMBERS', 'tokens']);
-      const tokens = Array.isArray(membersRes?.result) ? membersRes.result : [];
       const dead = tokens.length ? await sendPush(tokens, title, newest.link) : [];
       for (const t of dead) await redis(['SREM', 'tokens', t]);
       await redis(['SET', 'lastPostId', String(newestId)]);
-      return res.json({ ok: true, notified: tokens.length - dead.length, post: newestId });
+      return res.json({ ok: true, sent: tokens.length - dead.length, devices: tokens.length, post: newestId, forced: force });
     }
 
-    return res.json({ ok: true, upToDate: lastPostId });
+    return res.json({ ok: true, upToDate: lastPostId, devices: tokens.length });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err?.message || err) });
   }
