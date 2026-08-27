@@ -104,19 +104,23 @@ export default function Feed() {
     setPullVal(0);
   };
 
-  // Notify for any story (ZoltMoney or news) published since you last checked
-  // and within roughly the last day — so today's fresh content shows, old
-  // fetched posts don't. Treats ZoltMoney and news the same way.
+  // Notify for fresh stories. News is high-volume, so it uses "since you last
+  // checked" (last ~36h) to avoid spam. ZoltMoney posts less often, so it is NOT
+  // gated by the last-checked reset — any ZoltMoney post from the last few days
+  // shows, so its fresh articles always appear in the bell.
   const noteArrivals = useCallback((list: Article[]) => {
     if (!list?.length) return;
     const now = Date.now();
-    const RECENT_MS = 36 * 60 * 60 * 1000; // ~today
+    const NEWS_MS = 36 * 60 * 60 * 1000; // ~today
+    const BLOG_MS = 4 * 24 * 60 * 60 * 1000; // ZoltMoney: last few days
     const since = notifSinceRef.current;
     const add: Array<Article & { arrivedAt: number }> = [];
     for (const a of list) {
       if (!a || !a.id || notifiedIdsRef.current.has(a.id)) continue;
       const t = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
-      if (t > since && now - t < RECENT_MS) {
+      const isBlog = a.category === 'Blogs' || a.source === 'ZoltMoney';
+      const ok = isBlog ? t > 0 && now - t < BLOG_MS : t > since && now - t < NEWS_MS;
+      if (ok) {
         notifiedIdsRef.current.add(a.id);
         add.push({ ...a, arrivedAt: now });
       }
