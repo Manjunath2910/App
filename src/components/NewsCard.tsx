@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { readMinutes, type Article } from '@/data/news';
+import { type Article } from '@/data/news';
 import { useApp } from '@/store/app';
 import { openUrl } from '@/utils/openUrl';
 import { shareStory } from '@/utils/share';
@@ -30,7 +30,6 @@ export default function NewsCard({ article, height }: Props) {
   const saved = isBookmarked(article.id);
   const liked = isLiked(article.id);
   const listening = speakingId === article.id;
-  const mins = readMinutes(article.content || article.summary);
   const imageHeight = Math.round(height * 0.37); // smaller image → more room for description
   const { time, date } = inshortsMeta(article.publishedAt);
 
@@ -72,7 +71,7 @@ export default function NewsCard({ article, height }: Props) {
         {/* meta: short by {author} / {time} on {date} */}
         <Text style={[styles.meta, { color: metaText }]} numberOfLines={2}>
           <Text style={[styles.metaShort, { color: isDark ? palette.text : '#2B2B33' }]}>short </Text>
-          by {article.author} / {time} on {date} · {mins} min read
+          by {article.author} / {time} on {date}
         </Text>
 
         <Text style={[styles.summary, { color: bodyText }]}>{article.summary}</Text>
