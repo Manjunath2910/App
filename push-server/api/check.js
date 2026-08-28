@@ -110,6 +110,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: 'Storage not configured' });
   }
 
+  // Wipe all registered device tokens (for a clean re-test). ?reset=1
+  if (req.query?.reset === '1') {
+    await redis(['DEL', 'tokens']);
+    return res.json({ ok: true, reset: true, devices: 0 });
+  }
+
   try {
     const r = await fetch(BLOG_URL, { headers: { Accept: 'application/json' } });
     if (!r.ok) return res.status(502).json({ ok: false, error: `Blog HTTP ${r.status}` });
