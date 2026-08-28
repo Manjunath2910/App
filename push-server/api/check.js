@@ -51,6 +51,7 @@ async function sendPush(tokens, title, link) {
   }));
   const dead = [];
   const results = [];
+  const ids = [];
   for (const batch of chunk(messages, EXPO_BATCH_SIZE)) {
     try {
       const res = await fetch(EXPO_PUSH_URL, {
@@ -62,6 +63,7 @@ async function sendPush(tokens, title, link) {
       const tickets = json && Array.isArray(json.data) ? json.data : [];
       tickets.forEach((ticket, i) => {
         results.push({ status: ticket?.status, error: ticket?.details?.error || ticket?.message });
+        if (ticket?.id) ids.push(ticket.id);
         if (ticket?.status === 'error' && ticket?.details?.error === 'DeviceNotRegistered') {
           const t = batch[i]?.to;
           if (t) dead.push(t);
@@ -71,7 +73,26 @@ async function sendPush(tokens, title, link) {
       // ignore batch failure
     }
   }
-  return { dead, results };
+  return { dead, results, ids };
+}
+
+// Ask Expo whether each notification was actually delivered (receipts reveal
+// FCM-level errors like MismatchSenderId / InvalidCredentials that tickets hide).
+async function getReceipts(ids) {
+  if (!ids?.length) return [];
+  try {
+    await new Promise((r) => setTimeout(r, 2500));
+    const res = await fetch('https://exp.host/--/api/v2/push/getReceipts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    const json = await res.json().catch(() => null);
+    const data = json?.data || {};
+    return Object.entries(data).map(([id, r]) => ({ id, status: r?.status, error: r?.details?.error || r?.message }));
+  } catch (e) {
+    return [{ error: String(e?.message || e) }];
+  }
 }
 
 export default async function handler(req, res) {
@@ -115,10 +136,12 @@ export default async function handler(req, res) {
     // Send when there's a new post — or when ?force=1 is passed (manual test).
     if (force || newestId > lastPostId) {
       const title = cleanTitle(newest.title?.rendered ?? newest.title);
-      const out = tokens.length ? await sendPush(tokens, title, newest.link) : { dead: [], results: [] };
+      const out = tokens.length ? await sendPush(tokens, title, newest.link) : { dead: [], results: [], ids: [] };
       for (const t of out.dead) await redis(['SREM', 'tokens', t]);
       await redis(['SET', 'lastPostId', String(newestId)]);
-      return res.json({ ok: true, sent: tokens.length - out.dead.length, devices: tokens.length, post: newestId, forced: force, tickets: out.results });
+      // On a manual test, also fetch delivery receipts so we can see the real error.
+      const receipts = force ? await getReceipts(out.ids) : undefined;
+      return res.json({ ok: true, sent: tokens.length - out.dead.length, devices: tokens.length, post: newestId, forced: force, tickets: out.results, receipts });
     }
 
     return res.json({ ok: true, upToDate: lastPostId, devices: tokens.length });
